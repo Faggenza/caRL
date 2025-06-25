@@ -1,0 +1,5 @@
+gymnasium
+torch
+numpy
+pandas
+gymnasium[box2d]

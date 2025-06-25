@@ -1,5 +1,6 @@
 gymnasium
-pytorch
+pytorch==2.1
+matplotlib
 numpy
 pandas
 gymnasium-box2d

@@ -1,5 +1,6 @@
 gymnasium
-torch
+pytorch
 numpy
 pandas
-gymnasium[box2d]
+gymnasium-box2d
+conda-forge::box2d-py

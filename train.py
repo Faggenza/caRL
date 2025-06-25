@@ -38,13 +38,16 @@ def discrete_to_continuous_action(discrete_action):
     
     return continuous_action
 
-def calculate_returns(rewards, discount_factor):
+def calculate_returns(rewards, discount_factor, device=None):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
     returns = []
     cumulative_reward = 0
     for r in reversed(rewards):
         cumulative_reward = r + cumulative_reward * discount_factor
         returns.insert(0, cumulative_reward)
-    returns = torch.tensor(returns, dtype=torch.float32)
+    returns = torch.tensor(returns, dtype=torch.float32, device=device)
     
     eps = 1e-8
     if returns.std() > eps:
@@ -52,6 +55,11 @@ def calculate_returns(rewards, discount_factor):
     return returns
 
 def calculate_advantages(returns, values):
+    # Assicurati che siano sullo stesso device
+    device = returns.device
+    if values.device != device:
+        values = values.to(device)
+        
     advantages = returns - values
     eps = 1e-8
     if advantages.numel() > 0 and advantages.std() > eps:
@@ -68,7 +76,11 @@ def init_training():
     episode_reward = 0
     return states, actions, actions_log_probability, values, rewards, done, episode_reward
     
-def forward_pass(env, agent, optimizer, discount_factor):
+def forward_pass(env, agent, optimizer, discount_factor, device=None):
+    # Se il dispositivo non è specificato, usa quello di default
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
     states, actions, actions_log_probability, values, rewards, done, episode_reward = init_training()
     result = env.reset()
     if isinstance(result, tuple):
@@ -82,7 +94,7 @@ def forward_pass(env, agent, optimizer, discount_factor):
     
     while not done:
         flat_state = state.flatten()
-        state_tensor = torch.FloatTensor(flat_state).unsqueeze(0)
+        state_tensor = torch.FloatTensor(flat_state).unsqueeze(0).to(device)
         states.append(state_tensor)
         
         action_logits, value_pred = agent(state_tensor)
@@ -123,11 +135,11 @@ def forward_pass(env, agent, optimizer, discount_factor):
         values.append(value_pred)
         rewards.append(reward)
         episode_reward += reward
-    states = torch.cat(states)
-    actions = torch.cat(actions)
-    actions_log_probability = torch.tensor(actions_log_probability)
-    values = torch.cat(values).squeeze(-1)
-    returns = calculate_returns(rewards, discount_factor)
+    states = torch.cat(states).to(device)
+    actions = torch.cat(actions).to(device)
+    actions_log_probability = torch.tensor(actions_log_probability, device=device)
+    values = torch.cat(values).squeeze(-1).to(device)
+    returns = calculate_returns(rewards, discount_factor, device)
     advantages = calculate_advantages(returns, values)
     return episode_reward, states, actions, actions_log_probability, advantages, returns
     
@@ -141,7 +153,12 @@ def update_policy(
     optimizer,
     ppo_steps,
     epsilon,
-    entropy_coefficient):
+    entropy_coefficient,
+    device=None):
+    
+    # Se il dispositivo non è specificato, usa quello di default
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     BATCH_SIZE = 128
     total_policy_loss = 0
@@ -160,6 +177,13 @@ def update_policy(
             shuffle=True)  # Shuffle to avoid patterns
     for _ in range(ppo_steps):
         for batch_idx, (states, actions, actions_log_probability_old, advantages, returns) in enumerate(batch_dataset):
+            # Assicurati che tutti i tensori siano sul device corretto
+            states = states.to(device)
+            actions = actions.to(device)
+            actions_log_probability_old = actions_log_probability_old.to(device)
+            advantages = advantages.to(device)
+            returns = returns.to(device)
+            
             action_pred, value_pred = agent(states)
             value_pred = value_pred.squeeze(-1)
             

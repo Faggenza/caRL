@@ -26,8 +26,12 @@ def run_ppo(resume_from=None):
     
     latest_path = "saved_models/latest_model.pt"
     
+    # Determina il dispositivo da usare (GPU se disponibile, altrimenti CPU)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Utilizzo dispositivo: {device}")
+    
     # Create the agent
-    agent = create_agent(env_train, HIDDEN_DIMENSIONS, DROPOUT)
+    agent, device = create_agent(env_train, HIDDEN_DIMENSIONS, DROPOUT, device)
     
     # Use a smaller learning rate for stability
     optimizer = optim.Adam(agent.parameters(), lr=LEARNING_RATE, eps=1e-5)
@@ -43,7 +47,7 @@ def run_ppo(resume_from=None):
     
     # Load model if resuming training
     if resume_from:
-        checkpoint = torch.load(latest_path)
+        checkpoint = torch.load(latest_path, map_location=device)
         agent.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         start_episode = checkpoint['episode'] + 1
@@ -58,7 +62,8 @@ def run_ppo(resume_from=None):
                 env_train,
                 agent,
                 optimizer,
-                DISCOUNT_FACTOR)
+                DISCOUNT_FACTOR,
+                device)
         policy_loss, value_loss = update_policy(
                 agent,
                 states,
@@ -69,8 +74,9 @@ def run_ppo(resume_from=None):
                 optimizer,
                 PPO_STEPS,
                 EPSILON,
-                ENTROPY_COEFFICIENT)
-        test_reward = evaluate(env_test, agent)
+                ENTROPY_COEFFICIENT,
+                device)
+        test_reward = evaluate(env_test, agent, device)
         policy_losses.append(policy_loss)
         value_losses.append(value_loss)
         train_rewards.append(train_reward)
@@ -89,7 +95,8 @@ def run_ppo(resume_from=None):
             'train_rewards': train_rewards,
             'test_rewards': test_rewards,
             'policy_losses': policy_losses,
-            'value_losses': value_losses
+            'value_losses': value_losses,
+            'device': str(device)  # Save device information
         }, latest_path)
         
         if episode % PRINT_INTERVAL == 0:
@@ -108,7 +115,8 @@ def run_ppo(resume_from=None):
                 'train_rewards': train_rewards,
                 'test_rewards': test_rewards,
                 'policy_losses': policy_losses,
-                'value_losses': value_losses
+                'value_losses': value_losses,
+                'device': str(device)  # Save device information
             }, best_path)
             print(f'Reached reward threshold in {episode} episodes')
             print(f'Best model saved to {best_path}')
@@ -117,8 +125,35 @@ def run_ppo(resume_from=None):
     plot_test_rewards(test_rewards, REWARD_THRESHOLD)
     plot_losses(policy_losses, value_losses)
     
+def set_seed(seed=42):
+    """Set seed for reproducibility."""
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    
+def print_gpu_info():
+    """Print information about GPU if available."""
+    if torch.cuda.is_available():
+        print(f"CUDA Disponibile: Sì")
+        print(f"Dispositivi CUDA: {torch.cuda.device_count()}")
+        print(f"Nome del dispositivo CUDA: {torch.cuda.get_device_name(0)}")
+        print(f"Memoria allocata: {torch.cuda.memory_allocated(0) / 1024**2:.2f} MB")
+        print(f"Memoria massima allocata: {torch.cuda.max_memory_allocated(0) / 1024**2:.2f} MB")
+    else:
+        print("CUDA non disponibile. Usando CPU.")
+
 def main():   
     global env_train, env_test
+    
+    # Set seed for reproducibility
+    set_seed(42)
+    
+    # Print GPU info
+    print_gpu_info()
+    
     env_train = gym.make("CarRacing-v3", render_mode="rgb_array", lap_complete_percent=0.95, domain_randomize=False, continuous=True)
     env_test = gym.make("CarRacing-v3", render_mode="rgb_array", lap_complete_percent=0.95, domain_randomize=False, continuous=True)
     

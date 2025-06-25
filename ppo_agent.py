@@ -1,8 +1,11 @@
 from ppo_nets import BackboneNetwork, ActorCritic
 import torch
-import torch.nn.functional as f
-import numpy as np
-def create_agent(env_train, hidden_dimensions, dropout):
+
+def create_agent(env_train, hidden_dimensions, dropout, device=None):
+    # Determina il dispositivo da usare (GPU se disponibile, altrimenti CPU)
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
     INPUT_FEATURES = 96 * 96 * 3
     HIDDEN_DIMENSIONS = hidden_dimensions
     # CarRacing-v3 with discrete actions has 5 possible actions:
@@ -15,13 +18,17 @@ def create_agent(env_train, hidden_dimensions, dropout):
     CRITIC_OUTPUT_FEATURES = 1
     DROPOUT = dropout
     actor = BackboneNetwork(
-            INPUT_FEATURES, HIDDEN_DIMENSIONS, ACTOR_OUTPUT_FEATURES, DROPOUT)
+            INPUT_FEATURES, HIDDEN_DIMENSIONS, ACTOR_OUTPUT_FEATURES, DROPOUT).to(device)
     critic = BackboneNetwork(
-            INPUT_FEATURES, HIDDEN_DIMENSIONS, CRITIC_OUTPUT_FEATURES, DROPOUT)
+            INPUT_FEATURES, HIDDEN_DIMENSIONS, CRITIC_OUTPUT_FEATURES, DROPOUT).to(device)
     agent = ActorCritic(actor, critic)
-    return agent
+    return agent, device
 
-def evaluate(env, agent):
+def evaluate(env, agent, device=None):
+    # Se il dispositivo non è specificato, usa quello di default
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
     agent.eval()
     rewards = []
     done = False
@@ -34,7 +41,7 @@ def evaluate(env, agent):
         
     while not done:
         flat_state = state.flatten()
-        state_tensor = torch.FloatTensor(flat_state).unsqueeze(0)
+        state_tensor = torch.FloatTensor(flat_state).unsqueeze(0).to(device)
         with torch.no_grad():
             action_logits, _ = agent(state_tensor)
             action_probs = torch.nn.functional.softmax(action_logits, dim=-1)

@@ -24,6 +24,13 @@ class ActorCritic(torch.nn.Module):
         super().__init__()
         self.actor = actor
         self.critic = critic
+        
+    def to(self, device):
+        super().to(device)
+        self.actor = self.actor.to(device)
+        self.critic = self.critic.to(device)
+        return self
+        
     def forward(self, state):
         action_pred = self.actor(state)
         value_pred = self.critic(state)

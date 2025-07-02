@@ -3,41 +3,6 @@ import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
 from ppo_loss import calculate_surrogate_loss, calculate_losses
 
-def discrete_to_continuous_action(discrete_action):
-    """
-    Maps discrete actions to continuous actions for CarRacing-v3
-    
-    Args:
-        discrete_action (int): The discrete action index
-            0: do nothing
-            1: steer left
-            2: steer right
-            3: gas
-            4: brake
-    
-    Returns:
-        np.array: Continuous action vector [steering, gas, brake] where:
-            steering: -1 (left) to 1 (right)
-            gas: 0 to 1
-            brake: 0 to 1
-    """
-    # Initialize neutral action [steering=0, gas=0, brake=0]
-    continuous_action = np.array([0.0, 0.0, 0.0], dtype=np.float32)
-    
-    # Map discrete actions to continuous actions
-    if discrete_action == 0:  # do nothing
-        pass  # keep all values at 0
-    elif discrete_action == 1:  # steer left
-        continuous_action[0] = -1.0  # full left steering
-    elif discrete_action == 2:  # steer right
-        continuous_action[0] = 1.0   # full right steering
-    elif discrete_action == 3:  # gas
-        continuous_action[1] = 1.0   # full gas
-    elif discrete_action == 4:  # brake
-        continuous_action[2] = 1.0   # full brake
-    
-    return continuous_action
-
 def calculate_returns(rewards, discount_factor, device=None):
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -121,9 +86,7 @@ def forward_pass(env, agent, optimizer, discount_factor, device=None):
         action_int = int(action_index.item())
         action_int = np.array(action_int, dtype=np.uint32)
         
-        # Map discrete action to continuous action
-        continuous_action = discrete_to_continuous_action(action_int)
-        step_result = env.step(continuous_action)
+        step_result = env.step(action_int)
         
         if len(step_result) == 5:
             state, reward, terminated, truncated, _ = step_result

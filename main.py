@@ -154,10 +154,10 @@ def main():
     # Print GPU info
     print_gpu_info()
     
-    env_train = gym.make("CarRacing-v3", render_mode="rgb_array", lap_complete_percent=0.95, domain_randomize=False, continuous=True)
-    env_test = gym.make("CarRacing-v3", render_mode="rgb_array", lap_complete_percent=0.95, domain_randomize=False, continuous=True)
+    env_train = gym.make("CarRacing-v3", render_mode="human", lap_complete_percent=0.95, domain_randomize=False, continuous=False)
+    env_test = gym.make("CarRacing-v3", render_mode="human", lap_complete_percent=0.95, domain_randomize=False, continuous=False)
     
-    run_ppo(True)
+    run_ppo(False)
     env_train.close()
     env_test.close()
 

@@ -47,10 +47,7 @@ def evaluate(env, agent, device=None):
             action_probs = torch.nn.functional.softmax(action_logits, dim=-1)
             action_int = torch.argmax(action_probs, dim=-1).item()
         
-        # Map discrete action to continuous action
-        from train import discrete_to_continuous_action
-        continuous_action = discrete_to_continuous_action(action_int)
-        step_result = env.step(continuous_action)
+        step_result = env.step(action_int)
         if len(step_result) == 5:
             state, reward, terminated, truncated, _ = step_result
             done = terminated or truncated

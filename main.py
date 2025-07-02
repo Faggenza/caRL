@@ -76,6 +76,8 @@ def run_ppo(resume_from=None):
                 EPSILON,
                 ENTROPY_COEFFICIENT,
                 device)
+
+        # TODO DA VEDERE SE SI PUÒ FARE OGNI TOT EPOCHE
         test_reward = evaluate(env_test, agent, device)
         policy_losses.append(policy_loss)
         value_losses.append(value_loss)

@@ -30,7 +30,7 @@ def evaluate(env, agent, device=None):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     agent.eval()
-    rewards = []
+    rewards = [] # TODO GUARDARE QUESTI REWARD
     done = False
     episode_reward = 0
     result = env.reset()
@@ -46,7 +46,8 @@ def evaluate(env, agent, device=None):
             action_logits, _ = agent(state_tensor)
             action_probs = torch.nn.functional.softmax(action_logits, dim=-1)
             action_int = torch.argmax(action_probs, dim=-1).item()
-        
+
+        # TODO DA VEDERE QUA CHE SUCCEDE
         step_result = env.step(action_int)
         if len(step_result) == 5:
             state, reward, terminated, truncated, _ = step_result

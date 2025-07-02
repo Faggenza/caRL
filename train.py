@@ -52,16 +52,20 @@ def forward_pass(env, agent, optimizer, discount_factor, device=None):
         state, _ = result
     else:
         state = result
+
+    # TODO VEDERE LOOP TRAIN DI TORCH
     agent.train()
     
     # Initialize gradient clipping to prevent explosions
+    # TODO VEDERE SE SERVE
     torch.nn.utils.clip_grad_norm_(agent.parameters(), max_norm=0.5)
     
     while not done:
         flat_state = state.flatten()
         state_tensor = torch.FloatTensor(flat_state).unsqueeze(0).to(device)
         states.append(state_tensor)
-        
+
+        # Questo forward pass restituisce due valori e non uno solo
         action_logits, value_pred = agent(state_tensor)
         
         if torch.isnan(action_logits).any():
@@ -98,6 +102,7 @@ def forward_pass(env, agent, optimizer, discount_factor, device=None):
         values.append(value_pred)
         rewards.append(reward)
         episode_reward += reward
+
     states = torch.cat(states).to(device)
     actions = torch.cat(actions).to(device)
     actions_log_probability = torch.tensor(actions_log_probability, device=device)

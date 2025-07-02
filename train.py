@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as f
 import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
 from ppo_loss import calculate_surrogate_loss, calculate_losses
@@ -13,7 +14,8 @@ def calculate_returns(rewards, discount_factor, device=None):
         cumulative_reward = r + cumulative_reward * discount_factor
         returns.insert(0, cumulative_reward)
     returns = torch.tensor(returns, dtype=torch.float32, device=device)
-    
+
+    # evita la divisione per valori troppo vicini a zero
     eps = 1e-8
     if returns.std() > eps:
         returns = (returns - returns.mean()) / (returns.std() + eps)
@@ -24,8 +26,14 @@ def calculate_advantages(returns, values):
     device = returns.device
     if values.device != device:
         values = values.to(device)
-        
+
+    '''
+    The advantage is calculated as the difference between the value predicted by the critic 
+    and the expected return from the actions chosen by the actor according to the policy
+    '''
     advantages = returns - values
+
+    # evita la divisione per valori troppo vicini a zero
     eps = 1e-8
     if advantages.numel() > 0 and advantages.std() > eps:
         advantages = (advantages - advantages.mean()) / (advantages.std() + eps)
@@ -48,6 +56,7 @@ def forward_pass(env, agent, optimizer, discount_factor, device=None):
         
     states, actions, actions_log_probability, values, rewards, done, episode_reward = init_training()
     result = env.reset()
+    # cambia in base alla versione di gym
     if isinstance(result, tuple):
         state, _ = result
     else:
@@ -59,7 +68,8 @@ def forward_pass(env, agent, optimizer, discount_factor, device=None):
     # Initialize gradient clipping to prevent explosions
     # TODO VEDERE SE SERVE
     torch.nn.utils.clip_grad_norm_(agent.parameters(), max_norm=0.5)
-    
+
+    # whether the environment has reached a terminal state
     while not done:
         flat_state = state.flatten()
         state_tensor = torch.FloatTensor(flat_state).unsqueeze(0).to(device)
@@ -78,8 +88,9 @@ def forward_pass(env, agent, optimizer, discount_factor, device=None):
         # 2: steer right
         # 3: gas
         # 4: brake
+
         dist = torch.distributions.Categorical(logits=action_logits)
-        
+        action_prob = f.softmax(action_logits, dim=-1)
         action_index = dist.sample()
         
         log_prob_action = dist.log_prob(action_index)

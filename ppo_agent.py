@@ -1,4 +1,4 @@
-from ppo_nets import BackboneNetwork, ActorCritic
+from ppo_nets import BaseNetwork, ActorCritic
 import torch
 
 def create_agent(env_train, hidden_dimensions, dropout, device=None):
@@ -17,9 +17,9 @@ def create_agent(env_train, hidden_dimensions, dropout, device=None):
     ACTOR_OUTPUT_FEATURES = 5
     CRITIC_OUTPUT_FEATURES = 1
     DROPOUT = dropout
-    actor = BackboneNetwork(
+    actor = BaseNetwork(
             INPUT_FEATURES, HIDDEN_DIMENSIONS, ACTOR_OUTPUT_FEATURES, DROPOUT).to(device)
-    critic = BackboneNetwork(
+    critic = BaseNetwork(
             INPUT_FEATURES, HIDDEN_DIMENSIONS, CRITIC_OUTPUT_FEATURES, DROPOUT).to(device)
     agent = ActorCritic(actor, critic)
     return agent, device
@@ -30,7 +30,7 @@ def evaluate(env, agent, device=None):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     agent.eval()
-    rewards = [] # TODO GUARDARE QUESTI REWARD
+    # rewards = [] # TODO GUARDARE QUESTI REWARD
     done = False
     episode_reward = 0
     result = env.reset()

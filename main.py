@@ -9,14 +9,14 @@ from plot import plot_train_rewards, plot_test_rewards, plot_losses
 
 def run_ppo(resume_from=None):
     MAX_EPISODES = 500
-    DISCOUNT_FACTOR = 0.99
+    DISCOUNT_FACTOR = 0.99 # TODO vedere se altri valori funzionano meglio
     REWARD_THRESHOLD = 475
     PRINT_INTERVAL = 10
     PPO_STEPS = 8
     N_TRIALS = 100
     EPSILON = 0.2
     ENTROPY_COEFFICIENT = 0.01
-    HIDDEN_DIMENSIONS = 64
+    HIDDEN_DIMENSIONS = 64 # TODO vedere se altre dimensioni funzionano meglio
     DROPOUT = 0.2
     LEARNING_RATE = 0.001
     train_rewards = []

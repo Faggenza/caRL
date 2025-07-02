@@ -12,6 +12,8 @@ def calculate_surrogate_loss(actions_log_probability_old, actions_log_probabilit
             policy_ratio = torch.nan_to_num(policy_ratio, nan=1.0)
             
         surrogate_loss_1 = policy_ratio * advantages
+        # versione "clippata" della funzione obiettivo surrogate
+        # limita policy_ratio tra 1-epsilon e 1+epsilon, poi moltiplica per advantages
         surrogate_loss_2 = torch.clamp(
                 policy_ratio, min=1.0-epsilon, max=1.0+epsilon
                 ) * advantages
@@ -22,5 +24,6 @@ def calculate_losses(
         surrogate_loss, entropy, entropy_coefficient, returns, value_pred):
     entropy_bonus = entropy_coefficient * entropy
     policy_loss = -(surrogate_loss + entropy_bonus).sum()
+    # helps to smoothen the loss function and makes it less sensitive to outliers.
     value_loss = torch.nn.functional.smooth_l1_loss(returns, value_pred).sum()
     return policy_loss, value_loss

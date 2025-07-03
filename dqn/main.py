@@ -97,7 +97,7 @@ def main(resume_from_checkpoint=False):
         sample = random.random()
         eps_threshold = EPS_END + (EPS_START - EPS_END) * \
             math.exp(-1. * steps_done / EPS_DECAY)
-        steps_done += 1
+
         if sample > eps_threshold:
             with torch.no_grad():
                 # t.max(1) will return the largest column value of each row.
@@ -110,12 +110,18 @@ def main(resume_from_checkpoint=False):
 
     episode_durations = []
     train_rewards = []
+    expected_rewards = []
+    losses = []
+
     for i_episode in range(start_episode, NUM_EPISODES):
         print(f'Starting episode {i_episode}')
         # Initialize the environment and get its state
         state, info = env.reset()
         state = torch.tensor(state.flatten(), dtype=torch.float32, device=device).unsqueeze(0)
         episode_reward = 0
+        episode_expected_reward = 0
+        episode_loss = 0
+        loss_steps_count = 0
 
         for t in count():
             steps_done+= 1
@@ -146,6 +152,10 @@ def main(resume_from_checkpoint=False):
                 gamma=GAMMA
             )
 
+            if loss is not None:
+                episode_loss += loss
+                loss_steps_count += 1
+
             # Soft update of the target network's weights
             # θ′ ← τ θ + (1 −τ )θ′
             target_net_state_dict = target_net.state_dict()
@@ -159,23 +169,29 @@ def main(resume_from_checkpoint=False):
                     'episode': i_episode,
                     'model_state_dict': policy_net_state_dict,
                     'optimizer_state_dict': optimizer.state_dict(),
-                    'train_rewards': reward,
+                    'train_rewards': np.mean(train_rewards[-100:]) if train_rewards else 0,
+                    'episode_durations': episode_durations,
+                    'losses': losses,
                     'steps_done': steps_done,
-                    #'test_rewards': test_rewards,
-                    #'policy_losses': policy_losses,
-                    #'value_losses': value_losses,
-                    'device': str(device)  # Save device information
+                    'device': str(device)
                 }, latest_path)
-                episode_durations.append(t + 1)
                 break
+
         train_rewards.append(episode_reward)
         mean_train_reward = np.mean(train_rewards[-100:])  # Mean reward over the last 100 episodes
+        if loss_steps_count > 0:
+            episode_loss /= loss_steps_count
+            losses.append(episode_loss)
+        else:
+            losses.append(0)
 
-        if loss is not None:
-            if i_episode % 20 == 0:
-                print(f'Mean train reward: {mean_train_reward}'
-                      f' Expected reward: {expected_reward[-1]}'
-                     )
+        mean_loss = np.mean(losses[-100:])
+        eps_threshold = EPS_END + (EPS_START - EPS_END) * math.exp(-1. * steps_done / EPS_DECAY)
+
+        if i_episode % 1 == 0:
+            print(f'Mean train reward: {mean_train_reward:.4f}\n'
+                  f'Mean loss: {mean_loss:.4f}\n'
+                  f'Epsilon: {eps_threshold:.4f}')
 
 
     print('Complete')

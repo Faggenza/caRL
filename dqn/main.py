@@ -15,8 +15,10 @@ import torch.nn.functional as F
 from memory import ReplayMemory
 from q_network import DQN
 
-def main():
+def main(resume_from_checkpoint=False):
 
+    latest_path = "saved_models/dqn_model.pt"
+    
     env = gym.make("CarRacing-v3", render_mode="human", lap_complete_percent=0.95, domain_randomize=False,
                          continuous=False)
 
@@ -77,7 +79,16 @@ def main():
 
 
     steps_done = 0
-
+    if resume_from_checkpoint:
+        try:
+            checkpoint = torch.load(latest_path, map_location=device)
+            policy_net.load_state_dict(checkpoint['model_state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            steps_done = checkpoint.get('steps_done', 0) 
+            print(f"Resuming training from step {steps_done}")
+        except FileNotFoundError:
+            print("No checkpoint found, starting fresh.")
+    
     def select_action(state, steps_done=steps_done):
         sample = random.random()
         eps_threshold = EPS_END + (EPS_START - EPS_END) * \
@@ -139,6 +150,17 @@ def main():
             target_net.load_state_dict(target_net_state_dict)
 
             if done:
+                torch.save({
+                    'episode': i_episode,
+                    'model_state_dict': policy_net_state_dict,
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'train_rewards': reward,
+                    'steps_done': steps_done,
+                    #'test_rewards': test_rewards,
+                    #'policy_losses': policy_losses,
+                    #'value_losses': value_losses,
+                    'device': str(device)  # Save device information
+                }, latest_path)
                 episode_durations.append(t + 1)
                 plot_durations()
                 break
@@ -150,5 +172,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(resume_from_checkpoint=True)
 

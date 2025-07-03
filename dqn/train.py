@@ -4,7 +4,7 @@ from memory import Transition
 
 def optimize_model(memory, policy_net, target_net, optimizer, device, batch_size, gamma):
     if len(memory) < batch_size:
-        return
+        return None, None, None
     transitions = memory.sample(batch_size)
     # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
     # detailed explanation). This converts batch-array of Transitions
@@ -47,3 +47,5 @@ def optimize_model(memory, policy_net, target_net, optimizer, device, batch_size
     # In-place gradient clipping
     torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
     optimizer.step()
+
+    return state_action_values, expected_state_action_values, loss.item()

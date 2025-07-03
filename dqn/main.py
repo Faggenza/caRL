@@ -2,6 +2,9 @@ import gymnasium as gym
 import math
 import random
 from itertools import count
+
+import numpy as np
+
 from train import optimize_model
 import torch
 import torch.optim as optim
@@ -106,16 +109,20 @@ def main(resume_from_checkpoint=False):
 
 
     episode_durations = []
+    train_rewards = []
     for i_episode in range(start_episode, NUM_EPISODES):
         print(f'Starting episode {i_episode}')
         # Initialize the environment and get its state
         state, info = env.reset()
         state = torch.tensor(state.flatten(), dtype=torch.float32, device=device).unsqueeze(0)
+        episode_reward = 0
+
         for t in count():
             steps_done+= 1
             action = select_action(state, steps_done)
             observation, reward, terminated, truncated, _ = env.step(action.item())
             reward = torch.tensor([reward], device=device)
+            episode_reward += reward.item()
             done = terminated or truncated
 
             if terminated:
@@ -129,7 +136,7 @@ def main(resume_from_checkpoint=False):
             state = next_state
 
             # Perform one step of the optimization (on the policy network)
-            optimize_model(
+            state_reward, expected_reward, loss = optimize_model(
                 memory=memory,
                 policy_net=policy_net,
                 target_net=target_net,
@@ -161,6 +168,15 @@ def main(resume_from_checkpoint=False):
                 }, latest_path)
                 episode_durations.append(t + 1)
                 break
+        train_rewards.append(episode_reward)
+        mean_train_reward = np.mean(train_rewards[-100:])  # Mean reward over the last 100 episodes
+
+        if loss is not None:
+            if i_episode % 20 == 0:
+                print(f'Mean train reward: {mean_train_reward}'
+                      f' Expected reward: {expected_reward[-1]}'
+                     )
+
 
     print('Complete')
     if plot_flag:

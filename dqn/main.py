@@ -1,24 +1,17 @@
 import gymnasium as gym
 import math
 import random
-import matplotlib
-import matplotlib.pyplot as plt
-from collections import namedtuple, deque
 from itertools import count
-from plot import plot_durations
 from train import optimize_model
 import torch
-import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
 
 from memory import ReplayMemory
 from q_network import DQN
 
 def main(resume_from_checkpoint=False):
-
     latest_path = "saved_models/dqn_model.pt"
-    
+
     env = gym.make("CarRacing-v3", render_mode="human", lap_complete_percent=0.95, domain_randomize=False,
                          continuous=False)
 
@@ -29,6 +22,12 @@ def main(resume_from_checkpoint=False):
         "cpu"
     )
 
+    if device == torch.device("cuda"):
+        plot_flag = False
+    else:
+        plot_flag = True
+        import matplotlib.pyplot as plt
+        from plot import plot_durations
 
     # To ensure reproducibility during training, you can fix the random seeds
     # by uncommenting the lines below. This makes the results consistent across
@@ -79,17 +78,18 @@ def main(resume_from_checkpoint=False):
 
 
     steps_done = 0
+    start_episode = 1
     if resume_from_checkpoint:
         try:
             checkpoint = torch.load(latest_path, map_location=device)
+            start_episode = checkpoint['episode'] + 1
             policy_net.load_state_dict(checkpoint['model_state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            steps_done = checkpoint.get('steps_done', 0) 
-            print(f"Resuming training from step {steps_done}")
+            steps_done = checkpoint.get('steps_done', 0)
         except FileNotFoundError:
             print("No checkpoint found, starting fresh.")
-    
-    def select_action(state, steps_done=steps_done):
+
+    def select_action(state, steps_done):
         sample = random.random()
         eps_threshold = EPS_END + (EPS_START - EPS_END) * \
             math.exp(-1. * steps_done / EPS_DECAY)
@@ -109,13 +109,14 @@ def main(resume_from_checkpoint=False):
         num_episodes = 50
 
     episode_durations = []
-    for i_episode in range(num_episodes):
+    for i_episode in range(start_episode, num_episodes):
         print(f'Starting episode {i_episode}')
         # Initialize the environment and get its state
         state, info = env.reset()
         state = torch.tensor(state.flatten(), dtype=torch.float32, device=device).unsqueeze(0)
         for t in count():
-            action = select_action(state)
+            steps_done+= 1
+            action = select_action(state, steps_done)
             observation, reward, terminated, truncated, _ = env.step(action.item())
             reward = torch.tensor([reward], device=device)
             done = terminated or truncated
@@ -162,13 +163,13 @@ def main(resume_from_checkpoint=False):
                     'device': str(device)  # Save device information
                 }, latest_path)
                 episode_durations.append(t + 1)
-                plot_durations()
                 break
 
     print('Complete')
-    plot_durations(show_result=True, episode_durations=episode_durations)
-    plt.ioff()
-    plt.show()
+    if plot_flag:
+        plot_durations(show_result=True, episode_durations=episode_durations)
+        plt.ioff()
+        plt.show()
 
 
 if __name__ == "__main__":

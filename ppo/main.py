@@ -23,7 +23,8 @@ def run_ppo(resume_from=None):
     test_rewards = []
     policy_losses = []
     value_losses = []
-    
+
+    mean_test_rewards = 0
     latest_path = "saved_models/latest_model.pt"
     
     # Determina il dispositivo da usare (GPU se disponibile, altrimenti CPU)

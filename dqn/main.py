@@ -61,6 +61,7 @@ def main(resume_from_checkpoint=False):
     EPS_DECAY = 2500
     TAU = 0.005
     LR = 3e-4
+    NUM_EPISODES = 500
 
 
     # Get number of actions from gym action space
@@ -103,13 +104,9 @@ def main(resume_from_checkpoint=False):
         else:
             return torch.tensor([[env.action_space.sample()]], device=device, dtype=torch.long)
 
-    if torch.cuda.is_available() or torch.backends.mps.is_available():
-        num_episodes = 600
-    else:
-        num_episodes = 50
 
     episode_durations = []
-    for i_episode in range(start_episode, num_episodes):
+    for i_episode in range(start_episode, NUM_EPISODES):
         print(f'Starting episode {i_episode}')
         # Initialize the environment and get its state
         state, info = env.reset()
@@ -171,7 +168,43 @@ def main(resume_from_checkpoint=False):
         plt.ioff()
         plt.show()
 
+def test():
+    latest_path = "saved_models/dqn_model.pt"
+    env = gym.make("CarRacing-v3", render_mode="human", lap_complete_percent=0.95, domain_randomize=False,
+                         continuous=False)
 
+    device = torch.device(
+        "cuda" if torch.cuda.is_available() else
+        "mps" if torch.backends.mps.is_available() else
+        "cpu"
+    )
+
+    # Get number of actions and observations like in main()
+    n_actions = env.action_space.n
+    state, _ = env.reset()
+    n_observations = state.flatten().shape[0]
+    
+    policy_net = DQN(n_observations, n_actions).to(device)
+    checkpoint = torch.load(latest_path, map_location=device)
+    policy_net.load_state_dict(checkpoint['model_state_dict'])
+    policy_net.to(device)
+    policy_net.eval()
+
+    state, _ = env.reset()
+    state = torch.tensor(state.flatten(), dtype=torch.float32, device=device).unsqueeze(0)
+
+    for t in count():
+        action = policy_net(state).max(1).indices.view(1, 1)
+        observation, _ , terminated, truncated, _ = env.step(action.item())
+        done = terminated or truncated
+
+        if done:
+            print(f"Episode finished after {t + 1} timesteps")
+            break
+
+        state = torch.tensor(observation.flatten(), dtype=torch.float32, device=device).unsqueeze(0)
+        
 if __name__ == "__main__":
     main(resume_from_checkpoint=True)
+    #test()
 

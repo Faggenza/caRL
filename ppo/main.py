@@ -34,7 +34,7 @@ def run_ppo(resume_from=None):
     agent, device = create_agent(env_train, HIDDEN_DIMENSIONS, DROPOUT, device)
     
     # Use a smaller learning rate for stability
-    optimizer = optim.Adam(agent.parameters(), lr=LEARNING_RATE, eps=1e-5)
+    optimizer = optim.AdamW(agent.parameters(), lr=LEARNING_RATE, eps=1e-5)
     
     # Add gradient clipping to prevent exploding gradients
     torch.nn.utils.clip_grad_norm_(agent.parameters(), max_norm=0.5)
@@ -110,7 +110,7 @@ def run_ppo(resume_from=None):
                   | Mean Abs Value Loss: {mean_abs_value_loss:2.2f}')
             
         if mean_test_rewards >= REWARD_THRESHOLD:
-            best_path = "saved_models/best_model.pt"
+            best_path = "ppo/saved_models/best_model.pt"
             torch.save({
                 'episode': episode,
                 'model_state_dict': agent.state_dict(),

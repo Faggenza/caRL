@@ -98,6 +98,7 @@ else:
 
 episode_durations = []
 for i_episode in range(num_episodes):
+    print(f'Starting episode {i_episode}')
     # Initialize the environment and get its state
     state, info = env.reset()
     state = torch.tensor(state.flatten(), dtype=torch.float32, device=device).unsqueeze(0)

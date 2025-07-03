@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as f
 import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
-from ppo_loss import calculate_surrogate_loss, calculate_losses
+from ppo.ppo_loss import calculate_surrogate_loss, calculate_losses
 
 def calculate_returns(rewards, discount_factor, device=None):
     if device is None:

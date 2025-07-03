@@ -15,7 +15,7 @@ from q_network import DQN
 def main(resume_from_checkpoint=False):
     latest_path = "saved_models/dqn_model.pt"
 
-    env = gym.make("CarRacing-v3", render_mode="human", lap_complete_percent=0.95, domain_randomize=False,
+    env = gym.make("CarRacing-v3", render_mode="rgb_array", lap_complete_percent=0.95, domain_randomize=False,
                          continuous=False)
 
     # if GPU is to be used
@@ -40,14 +40,14 @@ def main(resume_from_checkpoint=False):
     # the model explore different training trajectories.
 
 
-    # seed = 42
-    # random.seed(seed)
-    # torch.manual_seed(seed)
-    # env.reset(seed=seed)
-    # env.action_space.seed(seed)
-    # env.observation_space.seed(seed)
-    # if torch.cuda.is_available():
-    #     torch.cuda.manual_seed(seed)
+    seed = 42
+    random.seed(seed)
+    torch.manual_seed(seed)
+    env.reset(seed=seed)
+    env.action_space.seed(seed)
+    env.observation_space.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
 
     # BATCH_SIZE is the number of transitions sampled from the replay buffer
     # GAMMA is the discount factor as mentioned in the previous section
@@ -61,7 +61,7 @@ def main(resume_from_checkpoint=False):
     GAMMA = 0.99
     EPS_START = 0.9
     EPS_END = 0.01
-    EPS_DECAY = 2500
+    EPS_DECAY = 30000
     TAU = 0.005
     LR = 3e-4
     NUM_EPISODES = 500
@@ -188,7 +188,7 @@ def main(resume_from_checkpoint=False):
         mean_loss = np.mean(losses[-100:])
         eps_threshold = EPS_END + (EPS_START - EPS_END) * math.exp(-1. * steps_done / EPS_DECAY)
 
-        if i_episode % 1 == 0:
+        if i_episode % 10 == 0:
             print(f'Mean train reward: {mean_train_reward:.4f}\n'
                   f'Mean loss: {mean_loss:.4f}\n'
                   f'Epsilon: {eps_threshold:.4f}')
@@ -237,6 +237,6 @@ def test():
         state = torch.tensor(observation.flatten(), dtype=torch.float32, device=device).unsqueeze(0)
         
 if __name__ == "__main__":
-    main(resume_from_checkpoint=True)
+    main(resume_from_checkpoint=False)
     #test()
 

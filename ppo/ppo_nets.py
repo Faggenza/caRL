@@ -44,4 +44,17 @@ class ActorCritic(torch.nn.Module):
         action_pred = self.actor(state)
         value_pred = self.critic(state)
         return action_pred, value_pred
+
+'''
+actor_net = nn.Sequential(
+    nn.LazyLinear(num_cells, device=device),
+    nn.Tanh(),
+    nn.LazyLinear(num_cells, device=device),
+    nn.Tanh(),
+    nn.LazyLinear(num_cells, device=device),
+    nn.Tanh(),
+    nn.LazyLinear(2 * env.action_spec.shape[-1], device=device),
+    NormalParamExtractor(),
+)
+'''
     

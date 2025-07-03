@@ -88,11 +88,10 @@ def forward_pass(env, agent, optimizer, discount_factor, device=None):
         # 2: steer right
         # 3: gas
         # 4: brake
-
-        dist = torch.distributions.Categorical(logits=action_logits)
-        action_prob = f.softmax(action_logits, dim=-1)
-        action_index = dist.sample()
         
+        action_prob = f.softmax(action_logits, dim=-1)
+        dist = torch.distributions.Categorical(logits=action_prob)
+        action_index = dist.sample()
         log_prob_action = dist.log_prob(action_index)
         if torch.isnan(log_prob_action).any():
             print("Warning: NaN detected in log_prob_action, replacing with zeros")

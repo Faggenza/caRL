@@ -77,14 +77,10 @@ def run_ppo(resume_from=None):
                 ENTROPY_COEFFICIENT,
                 device)
 
-        # TODO DA VEDERE SE SI PUÒ FARE OGNI TOT EPOCHE
-        test_reward = evaluate(env_test, agent, device)
         policy_losses.append(policy_loss)
         value_losses.append(value_loss)
         train_rewards.append(train_reward)
-        test_rewards.append(test_reward)
         mean_train_rewards = np.mean(train_rewards[-N_TRIALS:])
-        mean_test_rewards = np.mean(test_rewards[-N_TRIALS:])
         mean_abs_policy_loss = np.mean(np.abs(policy_losses[-N_TRIALS:]))
         mean_abs_value_loss = np.mean(np.abs(value_losses[-N_TRIALS:]))
         
@@ -102,6 +98,11 @@ def run_ppo(resume_from=None):
         }, latest_path)
         
         if episode % PRINT_INTERVAL == 0:
+            # Evaluate the agent on the test environment every PRINT_INTERVAL episodes
+            test_reward = evaluate(env_test, agent, device)
+            test_rewards.append(test_reward)
+            mean_test_rewards = np.mean(test_rewards[-N_TRIALS:])
+
             print(f'Episode: {episode:3} | \
                   Mean Train Rewards: {mean_train_rewards:3.1f} \
                   | Mean Test Rewards: {mean_test_rewards:3.1f} \

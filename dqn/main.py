@@ -12,8 +12,8 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 
-from dqn.memory import ReplayMemory
-from dqn.q_network import DQN
+from memory import ReplayMemory
+from q_network import DQN
 
 def main():
 
@@ -78,8 +78,7 @@ def main():
 
     steps_done = 0
 
-    def select_action(state):
-        global steps_done
+    def select_action(state, steps_done=steps_done):
         sample = random.random()
         eps_threshold = EPS_END + (EPS_START - EPS_END) * \
             math.exp(-1. * steps_done / EPS_DECAY)

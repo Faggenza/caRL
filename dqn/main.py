@@ -4,6 +4,8 @@ import random
 from itertools import count
 
 import os
+
+from dqn.plot import plot_test
 from train import optimize_model
 import torch
 import torch.optim as optim
@@ -80,7 +82,6 @@ def main(resume_from_checkpoint=False):
     optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
     memory = ReplayMemory(10000)
 
-
     steps_done = 0
     start_episode = 1
     if resume_from_checkpoint:
@@ -96,6 +97,9 @@ def main(resume_from_checkpoint=False):
             print(f"Resuming from episode {start_episode}")
         except FileNotFoundError:
             os.makedirs(os.path.dirname("saved_models"), exist_ok=True)
+            episode_durations = []
+            train_rewards = []
+            losses = []
             print("No checkpoint found, starting fresh.")
 
     def select_action(state, steps_done):
@@ -111,12 +115,6 @@ def main(resume_from_checkpoint=False):
                 return policy_net(state).max(1).indices.view(1, 1)
         else:
             return torch.tensor([[env.action_space.sample()]], device=device, dtype=torch.long)
-
-
-    episode_durations = []
-    train_rewards = []
-    expected_rewards = []
-    losses = []
 
     for i_episode in range(start_episode, NUM_EPISODES + 1):
         print(f'Starting episode {i_episode}')
@@ -174,7 +172,7 @@ def main(resume_from_checkpoint=False):
                     'episode': i_episode,
                     'model_state_dict': policy_net_state_dict,
                     'optimizer_state_dict': optimizer.state_dict(),
-                    'train_rewards': train_rewards if train_rewards else 0,
+                    'train_rewards': train_rewards,
                     'episode_durations': episode_durations,
                     'losses': losses,
                     'steps_done': steps_done,
@@ -198,10 +196,11 @@ def main(resume_from_checkpoint=False):
         plt.ioff()
         plt.show()
 
+
 def test():
     latest_path = "saved_models/dqn_model.pt"
     env = gym.make("CarRacing-v3", render_mode="human", lap_complete_percent=0.95, domain_randomize=False,
-                         continuous=False)
+                   continuous=False)
 
     device = torch.device(
         "cuda" if torch.cuda.is_available() else
@@ -213,19 +212,27 @@ def test():
     n_actions = env.action_space.n
     state, _ = env.reset()
     n_observations = state.flatten().shape[0]
-    
+
     policy_net = DQN(n_observations, n_actions).to(device)
     checkpoint = torch.load(latest_path, map_location=device)
     policy_net.load_state_dict(checkpoint['model_state_dict'])
     policy_net.to(device)
     policy_net.eval()
 
+    # Estrai le metriche dal checkpoint
+    train_rewards = checkpoint.get('train_rewards', [])
+    losses = checkpoint.get('losses', [])
+    episodes = list(range(1, len(train_rewards) + 1))
+
+    plot_test(train_rewards, losses, episodes)
+
+    # Test dell'agente
     state, _ = env.reset()
     state = torch.tensor(state.flatten(), dtype=torch.float32, device=device).unsqueeze(0)
 
     for t in count():
         action = policy_net(state).max(1).indices.view(1, 1)
-        observation, _ , terminated, truncated, _ = env.step(action.item())
+        observation, _, terminated, truncated, _ = env.step(action.item())
         done = terminated or truncated
 
         if done:
@@ -235,6 +242,6 @@ def test():
         state = torch.tensor(observation.flatten(), dtype=torch.float32, device=device).unsqueeze(0)
         
 if __name__ == "__main__":
-    main(resume_from_checkpoint=True)
-    #test()
+    #main(resume_from_checkpoint=True)
+    test()
 

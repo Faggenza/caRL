@@ -3,3 +3,4 @@ ppo/saved_models/*
 dqn/saved_models/*
 saved_models/*
 .idea
+dqn/dqn_train_32000.txt

@@ -3,8 +3,7 @@ import math
 import random
 from itertools import count
 
-import numpy as np
-
+import os
 from train import optimize_model
 import torch
 import torch.optim as optim
@@ -13,9 +12,10 @@ from memory import ReplayMemory
 from q_network import DQN
 
 def main(resume_from_checkpoint=False):
+    
     latest_path = "saved_models/dqn_model.pt"
 
-    env = gym.make("CarRacing-v3", render_mode="rgb_array", lap_complete_percent=0.95, domain_randomize=False,
+    env = gym.make("CarRacing-v3", render_mode="human", lap_complete_percent=0.95, domain_randomize=False,
                          continuous=False)
 
     # if GPU is to be used
@@ -61,10 +61,10 @@ def main(resume_from_checkpoint=False):
     GAMMA = 0.99
     EPS_START = 0.9
     EPS_END = 0.01
-    EPS_DECAY = 30000
+    EPS_DECAY = 32000
     TAU = 0.005
     LR = 3e-4
-    NUM_EPISODES = 500
+    NUM_EPISODES = 1000
 
 
     # Get number of actions from gym action space
@@ -85,12 +85,17 @@ def main(resume_from_checkpoint=False):
     start_episode = 1
     if resume_from_checkpoint:
         try:
-            checkpoint = torch.load(latest_path, map_location=device)
+            checkpoint = torch.load(latest_path, map_location=device, weights_only=False)
             start_episode = checkpoint['episode'] + 1
             policy_net.load_state_dict(checkpoint['model_state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             steps_done = checkpoint.get('steps_done', 0)
+            losses = checkpoint.get('losses', [])
+            episode_durations = checkpoint.get('episode_durations', [])
+            train_rewards = checkpoint.get('train_rewards', [])
+            print(f"Resuming from episode {start_episode}")
         except FileNotFoundError:
+            os.makedirs(os.path.dirname("saved_models"), exist_ok=True)
             print("No checkpoint found, starting fresh.")
 
     def select_action(state, steps_done):
@@ -113,7 +118,7 @@ def main(resume_from_checkpoint=False):
     expected_rewards = []
     losses = []
 
-    for i_episode in range(start_episode, NUM_EPISODES):
+    for i_episode in range(start_episode, NUM_EPISODES + 1):
         print(f'Starting episode {i_episode}')
         # Initialize the environment and get its state
         state, info = env.reset()
@@ -169,7 +174,7 @@ def main(resume_from_checkpoint=False):
                     'episode': i_episode,
                     'model_state_dict': policy_net_state_dict,
                     'optimizer_state_dict': optimizer.state_dict(),
-                    'train_rewards': np.mean(train_rewards[-100:]) if train_rewards else 0,
+                    'train_rewards': train_rewards if train_rewards else 0,
                     'episode_durations': episode_durations,
                     'losses': losses,
                     'steps_done': steps_done,
@@ -178,21 +183,14 @@ def main(resume_from_checkpoint=False):
                 break
 
         train_rewards.append(episode_reward)
-        mean_train_reward = np.mean(train_rewards[-100:])  # Mean reward over the last 100 episodes
-        if loss_steps_count > 0:
-            episode_loss /= loss_steps_count
+        if episode_loss is not None:
             losses.append(episode_loss)
         else:
             losses.append(0)
-
-        mean_loss = np.mean(losses[-100:])
         eps_threshold = EPS_END + (EPS_START - EPS_END) * math.exp(-1. * steps_done / EPS_DECAY)
 
-        if i_episode % 10 == 0:
-            print(f'Mean train reward: {mean_train_reward:.4f}\n'
-                  f'Mean loss: {mean_loss:.4f}\n'
-                  f'Epsilon: {eps_threshold:.4f}')
-
+        if i_episode % 5 == 0:
+            print(f'Episode {i_episode}: 'f'Train reward: {train_rewards[-1]:.2f} |'  f' Loss: {losses[-1]:.2f} |'  f' Epsilon: {eps_threshold:.4f}')
 
     print('Complete')
     if plot_flag:
@@ -237,6 +235,6 @@ def test():
         state = torch.tensor(observation.flatten(), dtype=torch.float32, device=device).unsqueeze(0)
         
 if __name__ == "__main__":
-    main(resume_from_checkpoint=False)
+    main(resume_from_checkpoint=True)
     #test()
 

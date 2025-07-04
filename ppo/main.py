@@ -25,7 +25,7 @@ def run_ppo(resume_from=None):
     value_losses = []
 
     mean_test_rewards = 0
-    latest_path = "saved_models/latest_model.pt"
+    latest_path = "saved_models/ppo_model.pt"
     
     # Determina il dispositivo da usare (GPU se disponibile, altrimenti CPU)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

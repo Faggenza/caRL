@@ -2,23 +2,14 @@ import gymnasium as gym
 import numpy as np
 import torch
 import os
+from env import *
+from test_ppo import test_model
 from ppo_agent import create_agent, evaluate
 from torch import optim
+from test_ppo import *
 from train import forward_pass, update_policy
-from plot import plot_train_rewards, plot_test_rewards, plot_losses
 
-def run_ppo(resume_from=None):
-    MAX_EPISODES = 1000
-    DISCOUNT_FACTOR = 0.99 # TODO vedere se altri valori funzionano meglio
-    REWARD_THRESHOLD = 475
-    PRINT_INTERVAL = 5
-    PPO_STEPS = 8 # Like in the paper
-    N_TRIALS = 100
-    EPSILON = 0.2
-    ENTROPY_COEFFICIENT = 0.01
-    HIDDEN_DIMENSIONS = 64 # TODO vedere se altre dimensioni funzionano meglio
-    DROPOUT = 0.2
-    LEARNING_RATE = 0.001
+def run_ppo(resume_from, device, plot_flag):
     train_rewards = []
     test_rewards = []
     policy_losses = []
@@ -28,9 +19,8 @@ def run_ppo(resume_from=None):
     latest_path = "saved_models/ppo_model.pt"
     
     # Determina il dispositivo da usare (GPU se disponibile, altrimenti CPU)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Utilizzo dispositivo: {device}")
-    
+
+
     # Create the agent
     agent, device = create_agent(env_train, HIDDEN_DIMENSIONS, DROPOUT, device)
     
@@ -106,7 +96,11 @@ def run_ppo(resume_from=None):
             print(f'Episode: {episode:3} | Train Rewards: {train_reward:3.1f} \
                   | Policy Loss: {policy_loss:2.2f} \
                   | Value Loss: {value_loss:2.2f}')
-            
+
+        if episode % TEST_INTERVAL == 0:
+            episode_reward = test_model()
+            test_rewards.append(episode_reward)
+
         if mean_test_rewards >= REWARD_THRESHOLD:
             best_path = "ppo/saved_models/best_model.pt"
             torch.save({
@@ -122,9 +116,12 @@ def run_ppo(resume_from=None):
             print(f'Reached reward threshold in {episode} episodes')
             print(f'Best model saved to {best_path}')
             break
-    plot_train_rewards(train_rewards, REWARD_THRESHOLD)
-    plot_test_rewards(test_rewards, REWARD_THRESHOLD)
-    plot_losses(policy_losses, value_losses)
+
+    if plot_flag:
+        from plot import plot_train_rewards, plot_test_rewards, plot_losses
+        plot_train_rewards(train_rewards, REWARD_THRESHOLD)
+        plot_test_rewards(test_rewards, REWARD_THRESHOLD)
+        plot_losses(policy_losses, value_losses)
     
 def set_seed(seed=42, env=None):
     """Set seed for reproducibility."""
@@ -138,34 +135,26 @@ def set_seed(seed=42, env=None):
     env.action_space.seed(seed)
     env.observation_space.seed(seed)
 
-    
-def print_gpu_info():
-    """Print information about GPU if available."""
-    if torch.cuda.is_available():
-        print(f"CUDA Disponibile: Sì")
-        print(f"Dispositivi CUDA: {torch.cuda.device_count()}")
-        print(f"Nome del dispositivo CUDA: {torch.cuda.get_device_name(0)}")
-        print(f"Memoria allocata: {torch.cuda.memory_allocated(0) / 1024**2:.2f} MB")
-        print(f"Memoria massima allocata: {torch.cuda.max_memory_allocated(0) / 1024**2:.2f} MB")
-    else:
-        print("CUDA non disponibile. Usando CPU.")
-
 def main():   
-    global env_train# , env_test
+    global env_train
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Utilizzo dispositivo: {device}")
+
+    if device == torch.device("cuda"):
+        plot_flag = False
+        MODE = 'rgb_array'
+    else:
+        plot_flag = True
+        MODE = 'human'
     
-    # Set seed for reproducibility
-    
-    # Print GPU info
-    print_gpu_info()
-    
-    env_train = gym.make("CarRacing-v3", render_mode="human", lap_complete_percent=0.95, domain_randomize=False, continuous=False)
-    #env_test = gym.make("CarRacing-v3", render_mode="human", lap_complete_percent=0.95, domain_randomize=False, continuous=False)
-    
+    env_train = gym.make("CarRacing-v3", render_mode=MODE, lap_complete_percent=0.95, domain_randomize=False, continuous=False)
+
     set_seed(42, env_train)
 
-    run_ppo(False)
+    run_ppo(False, device, plot_flag)
     env_train.close()
-    #env_test.close()
 
 if __name__ == "__main__":
     main()
+    # test(first_time=True)

@@ -116,7 +116,6 @@ def main(resume_from_checkpoint=False):
             return torch.tensor([[env.action_space.sample()]], device=device, dtype=torch.long)
 
     for i_episode in range(start_episode, NUM_EPISODES + 1):
-        print(f'Starting episode {i_episode}')
         # Initialize the environment and get its state
         state, info = env.reset()
         state = torch.tensor(state.flatten(), dtype=torch.float32, device=device).unsqueeze(0)
@@ -187,6 +186,6 @@ def main(resume_from_checkpoint=False):
 
 
 if __name__ == "__main__":
-    main(resume_from_checkpoint=False)
-    #test()
+    #main(resume_from_checkpoint=False)
+    test(first_time=True)
 

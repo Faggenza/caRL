@@ -8,11 +8,11 @@ from train import forward_pass, update_policy
 from plot import plot_train_rewards, plot_test_rewards, plot_losses
 
 def run_ppo(resume_from=None):
-    MAX_EPISODES = 500
+    MAX_EPISODES = 1000
     DISCOUNT_FACTOR = 0.99 # TODO vedere se altri valori funzionano meglio
     REWARD_THRESHOLD = 475
-    PRINT_INTERVAL = 10
-    PPO_STEPS = 8
+    PRINT_INTERVAL = 5
+    PPO_STEPS = 8 # Like in the paper
     N_TRIALS = 100
     EPSILON = 0.2
     ENTROPY_COEFFICIENT = 0.01
@@ -58,7 +58,6 @@ def run_ppo(resume_from=None):
         value_losses = checkpoint['value_losses']
         print(f"Resuming training from episode {start_episode}, loaded from {resume_from}")
     for episode in range(start_episode, MAX_EPISODES+1):
-        print(f'Starting episode {episode}')
         train_reward, states, actions, actions_log_probability, advantages, returns = forward_pass(
                 env_train,
                 agent,
@@ -81,9 +80,9 @@ def run_ppo(resume_from=None):
         policy_losses.append(policy_loss)
         value_losses.append(value_loss)
         train_rewards.append(train_reward)
-        mean_train_rewards = np.mean(train_rewards[-N_TRIALS:])
-        mean_abs_policy_loss = np.mean(np.abs(policy_losses[-N_TRIALS:]))
-        mean_abs_value_loss = np.mean(np.abs(value_losses[-N_TRIALS:]))
+        #mean_train_rewards = np.mean(train_rewards[-N_TRIALS:])
+        #mean_abs_policy_loss = np.mean(np.abs(policy_losses[-N_TRIALS:]))
+        #mean_abs_value_loss = np.mean(np.abs(value_losses[-N_TRIALS:]))
         
         # Also save as latest model (overwrite)
         
@@ -100,15 +99,13 @@ def run_ppo(resume_from=None):
         
         if episode % PRINT_INTERVAL == 0:
             # Evaluate the agent on the test environment every PRINT_INTERVAL episodes
-            test_reward = evaluate(env_test, agent, device)
-            test_rewards.append(test_reward)
-            mean_test_rewards = np.mean(test_rewards[-N_TRIALS:])
+            #test_reward = evaluate(env_test, agent, device)
+            #test_rewards.append(test_reward)
+            #mean_test_rewards = np.mean(test_rewards[-N_TRIALS:])
 
-            print(f'Episode: {episode:3} | \
-                  Mean Train Rewards: {mean_train_rewards:3.1f} \
-                  | Mean Test Rewards: {mean_test_rewards:3.1f} \
-                  | Mean Abs Policy Loss: {mean_abs_policy_loss:2.2f} \
-                  | Mean Abs Value Loss: {mean_abs_value_loss:2.2f}')
+            print(f'Episode: {episode:3} | Train Rewards: {train_reward:3.1f} \
+                  | Policy Loss: {policy_loss:2.2f} \
+                  | Value Loss: {value_loss:2.2f}')
             
         if mean_test_rewards >= REWARD_THRESHOLD:
             best_path = "ppo/saved_models/best_model.pt"
@@ -120,7 +117,7 @@ def run_ppo(resume_from=None):
                 'test_rewards': test_rewards,
                 'policy_losses': policy_losses,
                 'value_losses': value_losses,
-                'device': str(device)  # Save device information
+                'device': str(device) 
             }, best_path)
             print(f'Reached reward threshold in {episode} episodes')
             print(f'Best model saved to {best_path}')
@@ -129,7 +126,7 @@ def run_ppo(resume_from=None):
     plot_test_rewards(test_rewards, REWARD_THRESHOLD)
     plot_losses(policy_losses, value_losses)
     
-def set_seed(seed=42):
+def set_seed(seed=42, env=None):
     """Set seed for reproducibility."""
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
@@ -137,6 +134,10 @@ def set_seed(seed=42):
     np.random.seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+    env.reset(seed=seed)
+    env.action_space.seed(seed)
+    env.observation_space.seed(seed)
+
     
 def print_gpu_info():
     """Print information about GPU if available."""
@@ -150,20 +151,21 @@ def print_gpu_info():
         print("CUDA non disponibile. Usando CPU.")
 
 def main():   
-    global env_train, env_test
+    global env_train# , env_test
     
     # Set seed for reproducibility
-    set_seed(42)
     
     # Print GPU info
     print_gpu_info()
     
     env_train = gym.make("CarRacing-v3", render_mode="human", lap_complete_percent=0.95, domain_randomize=False, continuous=False)
-    env_test = gym.make("CarRacing-v3", render_mode="human", lap_complete_percent=0.95, domain_randomize=False, continuous=False)
+    #env_test = gym.make("CarRacing-v3", render_mode="human", lap_complete_percent=0.95, domain_randomize=False, continuous=False)
     
+    set_seed(42, env_train)
+
     run_ppo(False)
     env_train.close()
-    env_test.close()
+    #env_test.close()
 
 if __name__ == "__main__":
     main()

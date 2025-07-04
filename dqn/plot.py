@@ -36,13 +36,13 @@ def plot_durations(show_result=False, episode_durations=None):
             display.display(plt.gcf())
 
 
-def plot_test(train_rewards=None, losses=None, episodes=None):
+def plot_test(train_rewards=None, episodes=None):
     # Plotta le metriche
     import matplotlib.pyplot as plt
     import numpy as np
 
-    if train_rewards and losses:
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
+    if train_rewards:
+        fig, (ax1) = plt.subplots(1, 1, figsize=(12, 8))
 
         # Plot train rewards
         ax1.plot(episodes, train_rewards, 'b-', linewidth=1, alpha=0.7, label='Valori originali')
@@ -61,32 +61,12 @@ def plot_test(train_rewards=None, losses=None, episodes=None):
         ax1.grid(True, alpha=0.3)
         ax1.legend()
 
-        # Plot losses
-        ax2.plot(episodes, losses, 'g-', linewidth=1, alpha=0.7, label='Valori originali')
-
-        # Media mobile di tutto il plot per le losses
-        window_size_loss = min(len(losses) // 10, 50)  # Finestra del 10% dei dati, max 50
-        if window_size_loss > 1:
-            moving_avg_loss = np.convolve(losses, np.ones(window_size_loss) / window_size_loss, mode='valid')
-            # Allinea gli episodi con la media mobile
-            episodes_aligned_loss = episodes[window_size_loss - 1:]
-            ax2.plot(episodes_aligned_loss, moving_avg_loss, 'orange', linewidth=2,
-                     label=f'Media mobile ({window_size_loss} episodi)')
-
-        ax2.set_xlabel('Episodi')
-        ax2.set_ylabel('Loss')
-        ax2.set_title('Loss durante il Training')
-        ax2.grid(True, alpha=0.3)
-        ax2.legend()
-
         plt.tight_layout()
         plt.show()
 
         print(f"Statistiche finali:")
         print(f"Episodi totali: {len(train_rewards)}")
         print(f"Finestra media mobile rewards: {window_size} episodi")
-        print(f"Finestra media mobile losses: {window_size_loss} episodi")
         print(f"Train reward medio (ultimi 100): {np.mean(train_rewards[-100:]):.2f}")
-        print(f"Loss media (ultimi 100): {np.mean(losses[-100:]):.2f}")
     else:
         print("Nessuna metrica trovata nel checkpoint")

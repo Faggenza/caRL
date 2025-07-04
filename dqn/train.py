@@ -48,4 +48,3 @@ def optimize_model(memory, policy_net, target_net, optimizer, device, batch_size
     torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
     optimizer.step()
 
-    return state_action_values, expected_state_action_values, loss.item()

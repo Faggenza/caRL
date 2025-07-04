@@ -2,10 +2,9 @@ import gymnasium as gym
 import math
 import random
 from itertools import count
-
 import os
-
-from dqn.plot import plot_test
+from test_dqn import test_model, test
+from plot import plot_test
 from train import optimize_model
 import torch
 import torch.optim as optim
@@ -17,9 +16,6 @@ def main(resume_from_checkpoint=False):
     
     latest_path = "saved_models/dqn_model.pt"
 
-    env = gym.make("CarRacing-v3", render_mode="human", lap_complete_percent=0.95, domain_randomize=False,
-                         continuous=False)
-
     # if GPU is to be used
     device = torch.device(
         "cuda" if torch.cuda.is_available() else
@@ -29,10 +25,15 @@ def main(resume_from_checkpoint=False):
 
     if device == torch.device("cuda"):
         plot_flag = False
+        render = "rgb_array"
     else:
         plot_flag = True
         import matplotlib.pyplot as plt
         from plot import plot_durations
+        render = "human"
+
+    env = gym.make("CarRacing-v3", render_mode=render, lap_complete_percent=0.95, domain_randomize=False,
+                       continuous=False)
 
     # To ensure reproducibility during training, you can fix the random seeds
     # by uncommenting the lines below. This makes the results consistent across
@@ -67,7 +68,7 @@ def main(resume_from_checkpoint=False):
     TAU = 0.005
     LR = 3e-4
     NUM_EPISODES = 1000
-
+    TEST_INTERVAL = 50
 
     # Get number of actions from gym action space
     n_actions = env.action_space.n
@@ -84,6 +85,8 @@ def main(resume_from_checkpoint=False):
 
     steps_done = 0
     start_episode = 1
+    episode_durations = []
+    train_rewards = []
     if resume_from_checkpoint:
         try:
             checkpoint = torch.load(latest_path, map_location=device, weights_only=False)
@@ -91,15 +94,11 @@ def main(resume_from_checkpoint=False):
             policy_net.load_state_dict(checkpoint['model_state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             steps_done = checkpoint.get('steps_done', 0)
-            losses = checkpoint.get('losses', [])
             episode_durations = checkpoint.get('episode_durations', [])
             train_rewards = checkpoint.get('train_rewards', [])
             print(f"Resuming from episode {start_episode}")
         except FileNotFoundError:
             os.makedirs(os.path.dirname("saved_models"), exist_ok=True)
-            episode_durations = []
-            train_rewards = []
-            losses = []
             print("No checkpoint found, starting fresh.")
 
     def select_action(state, steps_done):
@@ -122,9 +121,6 @@ def main(resume_from_checkpoint=False):
         state, info = env.reset()
         state = torch.tensor(state.flatten(), dtype=torch.float32, device=device).unsqueeze(0)
         episode_reward = 0
-        episode_expected_reward = 0
-        episode_loss = 0
-        loss_steps_count = 0
 
         for t in count():
             steps_done+= 1
@@ -145,7 +141,7 @@ def main(resume_from_checkpoint=False):
             state = next_state
 
             # Perform one step of the optimization (on the policy network)
-            state_reward, expected_reward, loss = optimize_model(
+            optimize_model(
                 memory=memory,
                 policy_net=policy_net,
                 target_net=target_net,
@@ -154,10 +150,6 @@ def main(resume_from_checkpoint=False):
                 batch_size=BATCH_SIZE,
                 gamma=GAMMA
             )
-
-            if loss is not None:
-                episode_loss += loss
-                loss_steps_count += 1
 
             # Soft update of the target network's weights
             # θ′ ← τ θ + (1 −τ )θ′
@@ -174,21 +166,18 @@ def main(resume_from_checkpoint=False):
                     'optimizer_state_dict': optimizer.state_dict(),
                     'train_rewards': train_rewards,
                     'episode_durations': episode_durations,
-                    'losses': losses,
                     'steps_done': steps_done,
                     'device': str(device)
                 }, latest_path)
                 break
 
         train_rewards.append(episode_reward)
-        if episode_loss is not None:
-            losses.append(episode_loss)
-        else:
-            losses.append(0)
         eps_threshold = EPS_END + (EPS_START - EPS_END) * math.exp(-1. * steps_done / EPS_DECAY)
 
         if i_episode % 5 == 0:
-            print(f'Episode {i_episode}: 'f'Train reward: {train_rewards[-1]:.2f} |'  f' Loss: {losses[-1]:.2f} |'  f' Epsilon: {eps_threshold:.4f}')
+            print(f'Episode {i_episode}: 'f'Train reward: {train_rewards[-1]:.2f} |'  f' Epsilon: {eps_threshold:.4f}')
+        if i_episode % TEST_INTERVAL == 0:
+            test_model()
 
     print('Complete')
     if plot_flag:
@@ -197,51 +186,7 @@ def main(resume_from_checkpoint=False):
         plt.show()
 
 
-def test():
-    latest_path = "saved_models/dqn_model.pt"
-    env = gym.make("CarRacing-v3", render_mode="human", lap_complete_percent=0.95, domain_randomize=False,
-                   continuous=False)
-
-    device = torch.device(
-        "cuda" if torch.cuda.is_available() else
-        "mps" if torch.backends.mps.is_available() else
-        "cpu"
-    )
-
-    # Get number of actions and observations like in main()
-    n_actions = env.action_space.n
-    state, _ = env.reset()
-    n_observations = state.flatten().shape[0]
-
-    policy_net = DQN(n_observations, n_actions).to(device)
-    checkpoint = torch.load(latest_path, map_location=device)
-    policy_net.load_state_dict(checkpoint['model_state_dict'])
-    policy_net.to(device)
-    policy_net.eval()
-
-    # Estrai le metriche dal checkpoint
-    train_rewards = checkpoint.get('train_rewards', [])
-    losses = checkpoint.get('losses', [])
-    episodes = list(range(1, len(train_rewards) + 1))
-
-    plot_test(train_rewards, losses, episodes)
-
-    # Test dell'agente
-    state, _ = env.reset()
-    state = torch.tensor(state.flatten(), dtype=torch.float32, device=device).unsqueeze(0)
-
-    for t in count():
-        action = policy_net(state).max(1).indices.view(1, 1)
-        observation, _, terminated, truncated, _ = env.step(action.item())
-        done = terminated or truncated
-
-        if done:
-            print(f"Episode finished after {t + 1} timesteps")
-            break
-
-        state = torch.tensor(observation.flatten(), dtype=torch.float32, device=device).unsqueeze(0)
-        
 if __name__ == "__main__":
-    #main(resume_from_checkpoint=True)
-    test()
+    main(resume_from_checkpoint=False)
+    #test()
 

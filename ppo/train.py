@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as f
 import numpy as np
 from env import *
+from preprocessing import *
 from torch.utils.data import TensorDataset, DataLoader
 from ppo_loss import calculate_surrogate_loss, calculate_losses
 
@@ -82,42 +83,45 @@ def init_training():
     done = False
     episode_reward = 0
     return states, actions, actions_log_probability, values, rewards, done, episode_reward
-    
+
+
 def forward_pass(env, agent, optimizer, discount_factor, device=None):
     # Se il dispositivo non è specificato, usa quello di default
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
+
     states, actions, actions_log_probability, values, rewards, done, episode_reward = init_training()
     result = env.reset()
     # cambia in base alla versione di gym
     if isinstance(result, tuple):
-        state, _ = result
+        raw_state, _ = result
     else:
-        state = result
+        raw_state = result
 
-    # TODO VEDERE LOOP TRAIN DI TORCH
+    # PREPROCESSING: applica preprocessing alla prima osservazione
+    state = preprocess_observation(raw_state)
+
     agent.train()
     # whether the environment has reached a terminal state
     while not done:
-        flat_state = state.flatten()
-        state_tensor = torch.FloatTensor(flat_state).unsqueeze(0).to(device)
+        # PREPROCESSING: stato già preprocessato, converte direttamente in tensor
+        state_tensor = torch.FloatTensor(state.flatten()).unsqueeze(0).to(device)
         states.append(state_tensor)
 
         # Questo forward pass restituisce due valori e non uno solo
         action_logits, value_pred = agent(state_tensor)
-        
+
         if torch.isnan(action_logits).any():
             print("Warning: NaN detected in action_logits during sampling, replacing with zeros")
             action_logits = torch.nan_to_num(action_logits, nan=0.0)
-            
+
         # CarRacing-v3 with discrete=True has 5 discrete actions:
         # 0: do nothing
         # 1: steer left
         # 2: steer right
         # 3: gas
         # 4: brake
-        
+
         action_prob = f.softmax(action_logits, dim=-1)
         dist = torch.distributions.Categorical(logits=action_prob)
         action_index = dist.sample()
@@ -128,14 +132,19 @@ def forward_pass(env, agent, optimizer, discount_factor, device=None):
 
         action_int = int(action_index.item())
         action_int = np.array(action_int, dtype=np.uint32)
-        
+
         step_result = env.step(action_int)
-        
+
         if len(step_result) == 5:
-            state, reward, terminated, truncated, _ = step_result
+            raw_next_state, reward, terminated, truncated, _ = step_result
             done = terminated or truncated
         else:
-            state, reward, done, _ = step_result
+            raw_next_state, reward, done, _ = step_result
+
+        # PREPROCESSING: applica preprocessing alla nuova osservazione
+        if not done:
+            state = preprocess_observation(raw_next_state)
+
         actions.append(action_index.unsqueeze(0))
         actions_log_probability.append(log_prob_action)
         values.append(value_pred)
@@ -146,14 +155,11 @@ def forward_pass(env, agent, optimizer, discount_factor, device=None):
     actions = torch.cat(actions).to(device)
     actions_log_probability = torch.tensor(actions_log_probability, device=device)
     values = torch.cat(values).squeeze(-1).to(device)
-    # returns = calculate_returns(rewards, discount_factor, device)
-    # advantages = calculate_advantages(returns, values)
 
     returns, advantages = calculate_returns_and_advantages(
         rewards, values, discount_factor, gae_lambda=0.95, device=device
     )
     return episode_reward, states, actions, actions_log_probability, advantages, returns
-
 
 def update_policy(
         agent,

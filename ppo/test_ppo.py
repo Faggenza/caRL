@@ -1,5 +1,6 @@
 import gymnasium as gym
 import torch
+from preprocessing import *
 from env import *
 from ppo_agent import evaluate, create_agent
 from plot import *
@@ -32,8 +33,9 @@ def test(first_time):
     env = gym.make("CarRacing-v3", render_mode=render, lap_complete_percent=0.95, domain_randomize=False,
                    continuous=False)
 
-    # Get number of actions and observations like in main()
-    state, _ = env.reset()
+    # PREPROCESSING: applica preprocessing all'osservazione iniziale
+    raw_state, _ = env.reset()
+    state = preprocess_observation(raw_state)
 
     checkpoint = torch.load(latest_path, map_location=device)
     agent, device = create_agent(hidden_dimensions=HIDDEN_DIMENSIONS, dropout=DROPOUT, device=device)
@@ -44,11 +46,48 @@ def test(first_time):
     policy_losses = checkpoint.get('policy_losses', [])
     value_losses = checkpoint.get('value_losses', [])
 
-    episode_reward = evaluate(env, agent, device)
+    # MODIFICA: passa lo stato preprocessato invece di env e agent separatamente
+    episode_reward = evaluate_with_preprocessing(env, agent, device, state)
 
     if plot_flag and first_time:
         plot_train_rewards(train_rewards, REWARD_THRESHOLD)
         plot_test_rewards(test_rewards, REWARD_THRESHOLD)
         plot_losses(policy_losses, value_losses)
+
+    return episode_reward
+
+def evaluate_with_preprocessing(env, agent, device, initial_state):
+    """
+    Versione modificata di evaluate che usa il preprocessing
+    """
+    agent.eval()
+    episode_reward = 0
+    state = initial_state
+    done = False
+
+    with torch.no_grad():
+        while not done:
+            # PREPROCESSING: stato già preprocessato, converte in tensor
+            state_tensor = torch.FloatTensor(state.flatten()).unsqueeze(0).to(device)
+
+            # Forward pass per ottenere l'azione
+            action_logits, _ = agent(state_tensor)
+            action_prob = torch.softmax(action_logits, dim=-1)
+            action = torch.argmax(action_prob, dim=-1).item()
+
+            # Esegui l'azione nell'ambiente
+            step_result = env.step(action)
+
+            if len(step_result) == 5:
+                raw_next_state, reward, terminated, truncated, _ = step_result
+                done = terminated or truncated
+            else:
+                raw_next_state, reward, done, _ = step_result
+
+            # PREPROCESSING: applica preprocessing alla nuova osservazione
+            if not done:
+                state = preprocess_observation(raw_next_state)
+
+            episode_reward += reward
 
     return episode_reward

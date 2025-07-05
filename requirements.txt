@@ -1,4 +1,5 @@
-# gymnasium==1.1 via pip 
+# gymnasium==1.1 via pip
+# opencv-python via pip
 pytorch==2.1
 matplotlib
 numpy

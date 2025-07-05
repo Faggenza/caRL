@@ -93,7 +93,12 @@ def run_ppo(resume_from, device, plot_flag):
         if episode % TEST_INTERVAL == 0:
             episode_reward = test_model()
             test_rewards.append(episode_reward)
-            mean_test_rewards = np.mean(test_rewards)
+
+            if len(test_rewards) >= N_TRIALS:
+                mean_test_rewards = np.mean(test_rewards[-N_TRIALS:])
+            else:
+                mean_test_rewards = np.mean(test_rewards)
+            print(f'Test reward: {episode_reward:.1f} | Mean test reward: {mean_test_rewards:.1f}')
 
             if mean_test_rewards >= REWARD_THRESHOLD:
                 best_path = "ppo/saved_models/best_model.pt"

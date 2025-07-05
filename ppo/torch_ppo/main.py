@@ -1,6 +1,5 @@
 from collections import defaultdict
-
-import matplotlib.pyplot as plt
+import os
 import torch
 from tensordict.nn import TensorDictModule
 from tensordict.nn.distributions import NormalParamExtractor
@@ -45,6 +44,7 @@ clip_epsilon = (
 gamma = 0.99
 lmbda = 0.95
 entropy_eps = 1e-4
+plot_flag = False
 
 base_env = GymEnv("CarRacing-v3", device=device, continuous=False, render_mode="rgb_array")
 env = TransformedEnv(
@@ -214,18 +214,46 @@ for i, tensordict_data in enumerate(collector):
     # this is a nice-to-have but nothing necessary for PPO to work.
     scheduler.step()
 
-plt.figure(figsize=(10, 10))
-plt.subplot(2, 2, 1)
-plt.plot(logs["reward"])
-plt.title("training rewards (average)")
-plt.subplot(2, 2, 2)
-plt.plot(logs["step_count"])
-plt.title("Max step count (training)")
-plt.subplot(2, 2, 3)
-plt.plot(logs["eval reward (sum)"])
-plt.title("Return (test)")
-plt.subplot(2, 2, 4)
-plt.plot(logs["eval step_count"])
-plt.title("Max step count (test)")
-plt.show()
+os.makedirs("saved_models", exist_ok=True)
+torch.save({
+    'policy_state_dict': policy_module.state_dict(),
+    'value_state_dict': value_module.state_dict(),
+    'optimizer_state_dict': optim.state_dict(),
+    'scheduler_state_dict': scheduler.state_dict(),
+    'training_logs': logs,
+    'hyperparameters': {
+        'num_cells': num_cells,
+        'lr': lr,
+        'frames_per_batch': frames_per_batch,
+        'total_frames': total_frames,
+        'sub_batch_size': sub_batch_size,
+        'num_epochs': num_epochs,
+        'clip_epsilon': clip_epsilon,
+        'gamma': gamma,
+        'lmbda': lmbda,
+        'entropy_eps': entropy_eps,
+    }
+}, 'saved_models/ppo_car_racing_model.pth')
+
+# Salva anche i moduli separatamente per facilità d'uso
+torch.save(policy_module.state_dict(), 'saved_models/policy_module.pth')
+torch.save(value_module.state_dict(), 'saved_models/value_module.pth')
+
+if plot_flag:
+    import matplotlib.pyplot as plt
+
+    plt.figure(figsize=(10, 10))
+    plt.subplot(2, 2, 1)
+    plt.plot(logs["reward"])
+    plt.title("training rewards (average)")
+    plt.subplot(2, 2, 2)
+    plt.plot(logs["step_count"])
+    plt.title("Max step count (training)")
+    plt.subplot(2, 2, 3)
+    plt.plot(logs["eval reward (sum)"])
+    plt.title("Return (test)")
+    plt.subplot(2, 2, 4)
+    plt.plot(logs["eval step_count"])
+    plt.title("Max step count (test)")
+    plt.show()
 

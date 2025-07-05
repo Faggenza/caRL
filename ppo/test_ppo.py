@@ -32,12 +32,11 @@ def test(first_time):
     env = gym.make("CarRacing-v3", render_mode=render, lap_complete_percent=0.95, domain_randomize=False,
                    continuous=False)
 
-
     # Get number of actions and observations like in main()
     state, _ = env.reset()
 
     checkpoint = torch.load(latest_path, map_location=device)
-    agent, device = create_agent(env, hidden_dimensions=HIDDEN_DIMENSIONS, dropout=0.2, device=device)
+    agent, device = create_agent(hidden_dimensions=HIDDEN_DIMENSIONS, dropout=DROPOUT, device=device)
     agent.load_state_dict(checkpoint['model_state_dict'])
 
     train_rewards = checkpoint.get('train_rewards', [])

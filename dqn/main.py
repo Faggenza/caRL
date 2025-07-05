@@ -186,6 +186,6 @@ def main(resume_from_checkpoint=False):
 
 
 if __name__ == "__main__":
-    #main(resume_from_checkpoint=False)
+    #main(resume_from_checkpoint=True)
     test(first_time=True)
 

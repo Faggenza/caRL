@@ -2,6 +2,7 @@ import gymnasium as gym
 import numpy as np
 import torch
 import os
+
 from env import *
 from test_ppo import test_model
 from ppo_agent import create_agent, evaluate
@@ -15,20 +16,12 @@ def run_ppo(resume_from, device, plot_flag):
     policy_losses = []
     value_losses = []
 
-    mean_test_rewards = 0
     latest_path = "saved_models/ppo_model.pt"
-    
-    # Determina il dispositivo da usare (GPU se disponibile, altrimenti CPU)
 
-
-    # Create the agent
-    agent, device = create_agent(env_train, HIDDEN_DIMENSIONS, DROPOUT, device)
+    agent, device = create_agent(HIDDEN_DIMENSIONS, DROPOUT, device)
     
     # Use a smaller learning rate for stability
     optimizer = optim.AdamW(agent.parameters(), lr=LEARNING_RATE, eps=1e-5)
-    
-    # Add gradient clipping to prevent exploding gradients
-    torch.nn.utils.clip_grad_norm_(agent.parameters(), max_norm=0.5)
     
     # Create directory for saved models if it doesn't exist
     os.makedirs("saved_models", exist_ok=True)
@@ -54,7 +47,7 @@ def run_ppo(resume_from, device, plot_flag):
                 optimizer,
                 DISCOUNT_FACTOR,
                 device)
-        policy_loss, value_loss = update_policy(
+        policy_loss, value_loss, _ = update_policy(
                 agent,
                 states,
                 actions,
@@ -100,22 +93,23 @@ def run_ppo(resume_from, device, plot_flag):
         if episode % TEST_INTERVAL == 0:
             episode_reward = test_model()
             test_rewards.append(episode_reward)
+            mean_test_rewards = np.mean(test_rewards)
 
-        if mean_test_rewards >= REWARD_THRESHOLD:
-            best_path = "ppo/saved_models/best_model.pt"
-            torch.save({
-                'episode': episode,
-                'model_state_dict': agent.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'train_rewards': train_rewards,
-                'test_rewards': test_rewards,
-                'policy_losses': policy_losses,
-                'value_losses': value_losses,
-                'device': str(device) 
-            }, best_path)
-            print(f'Reached reward threshold in {episode} episodes')
-            print(f'Best model saved to {best_path}')
-            break
+            if mean_test_rewards >= REWARD_THRESHOLD:
+                best_path = "ppo/saved_models/best_model.pt"
+                torch.save({
+                    'episode': episode,
+                    'model_state_dict': agent.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'train_rewards': train_rewards,
+                    'test_rewards': test_rewards,
+                    'policy_losses': policy_losses,
+                    'value_losses': value_losses,
+                    'device': str(device)
+                }, best_path)
+                print(f'Reached reward threshold in {episode} episodes')
+                print(f'Best model saved to {best_path}')
+                break
 
     if plot_flag:
         from plot import plot_train_rewards, plot_test_rewards, plot_losses

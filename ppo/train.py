@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as f
 import numpy as np
+from env import *
 from torch.utils.data import TensorDataset, DataLoader
 from ppo_loss import calculate_surrogate_loss, calculate_losses
 
@@ -39,6 +40,39 @@ def calculate_advantages(returns, values):
         advantages = (advantages - advantages.mean()) / (advantages.std() + eps)
     return advantages
 
+def calculate_returns_and_advantages(rewards, values, discount_factor=0.99, gae_lambda=0.95, device=None):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Calcola returns
+    returns = []
+    cumulative_reward = 0
+    for r in reversed(rewards):
+        cumulative_reward = r + cumulative_reward * discount_factor
+        returns.insert(0, cumulative_reward)
+
+    returns = torch.tensor(returns, dtype=torch.float32, device=device)
+    values = values.to(device)
+
+    next_values = torch.cat([values[1:], torch.zeros(1, device=device)])
+    rewards_tensor = torch.tensor(rewards, dtype=torch.float32, device=device)
+    td_errors = rewards_tensor + discount_factor * next_values - values
+
+    # Calcola GAE
+    advantages = []
+    gae = 0
+    for i in reversed(range(len(td_errors))):
+        gae = td_errors[i] + discount_factor * gae_lambda * gae
+        advantages.insert(0, gae)
+
+    advantages = torch.tensor(advantages, dtype=torch.float32, device=device)
+
+    eps = 1e-8
+    if advantages.numel() > 0 and advantages.std() > eps:
+        advantages = (advantages - advantages.mean()) / (advantages.std() + eps)
+
+    return returns, advantages
+
 def init_training():
     states = []
     actions = []
@@ -64,11 +98,6 @@ def forward_pass(env, agent, optimizer, discount_factor, device=None):
 
     # TODO VEDERE LOOP TRAIN DI TORCH
     agent.train()
-    
-    # Initialize gradient clipping to prevent explosions
-    # TODO VEDERE SE SERVE
-    torch.nn.utils.clip_grad_norm_(agent.parameters(), max_norm=0.5)
-
     # whether the environment has reached a terminal state
     while not done:
         flat_state = state.flatten()
@@ -117,42 +146,42 @@ def forward_pass(env, agent, optimizer, discount_factor, device=None):
     actions = torch.cat(actions).to(device)
     actions_log_probability = torch.tensor(actions_log_probability, device=device)
     values = torch.cat(values).squeeze(-1).to(device)
-    returns = calculate_returns(rewards, discount_factor, device)
-    advantages = calculate_advantages(returns, values)
+    # returns = calculate_returns(rewards, discount_factor, device)
+    # advantages = calculate_advantages(returns, values)
+
+    returns, advantages = calculate_returns_and_advantages(
+        rewards, values, discount_factor, gae_lambda=0.95, device=device
+    )
     return episode_reward, states, actions, actions_log_probability, advantages, returns
-    
+
+
 def update_policy(
-    agent,
-    states,
-    actions,
-    actions_log_probability_old,
-    advantages,
-    returns,
-    optimizer,
-    ppo_steps,
-    epsilon,
-    entropy_coefficient,
-    device=None):
-    
-    # Se il dispositivo non è specificato, usa quello di default
+        agent,
+        states,
+        actions,
+        actions_log_probability_old,
+        advantages,
+        returns,
+        optimizer,
+        ppo_steps,
+        epsilon,
+        entropy_coefficient,
+        device=None):
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
-    BATCH_SIZE = 128
+
     total_policy_loss = 0
     total_value_loss = 0
+    total_combined_loss = 0
+
     actions_log_probability_old = actions_log_probability_old.detach()
     actions = actions.detach()
+
     training_results_dataset = TensorDataset(
-            states,
-            actions,
-            actions_log_probability_old,
-            advantages,
-            returns)
+        states, actions, actions_log_probability_old, advantages, returns)
     batch_dataset = DataLoader(
-            training_results_dataset,
-            batch_size=BATCH_SIZE,
-            shuffle=True)  # Shuffle to avoid patterns
+        training_results_dataset, batch_size=BATCH_SIZE, shuffle=True)
+
     for _ in range(ppo_steps):
         for batch_idx, (states, actions, actions_log_probability_old, advantages, returns) in enumerate(batch_dataset):
             # Assicurati che tutti i tensori siano sul device corretto
@@ -161,34 +190,54 @@ def update_policy(
             actions_log_probability_old = actions_log_probability_old.to(device)
             advantages = advantages.to(device)
             returns = returns.to(device)
-            
+
+            # Forward pass
             action_pred, value_pred = agent(states)
             value_pred = value_pred.squeeze(-1)
-            
-            torch.nn.utils.clip_grad_norm_(agent.parameters(), max_norm=0.5)
-            
+
             if torch.isnan(action_pred).any():
                 print("Warning: NaN detected in action_pred, replacing with zeros")
                 action_pred = torch.nan_to_num(action_pred, nan=0.0)
-                
+
+            # Calcola le loss
             probability_distribution_new = torch.distributions.Categorical(logits=action_pred)
             entropy = probability_distribution_new.entropy().mean()
             actions_log_probability_new = probability_distribution_new.log_prob(actions.squeeze(-1))
+
             surrogate_loss = calculate_surrogate_loss(
-                    actions_log_probability_old,
-                    actions_log_probability_new,
-                    epsilon,
-                    advantages)
+                actions_log_probability_old,
+                actions_log_probability_new,
+                epsilon,
+                advantages)
+
             policy_loss, value_loss = calculate_losses(
-                    surrogate_loss,
-                    entropy,
-                    entropy_coefficient,
-                    returns,
-                    value_pred)
+                surrogate_loss,
+                entropy,
+                entropy_coefficient,
+                returns,
+                value_pred)
+
+            # CORREZIONE: Combina le loss in un'unica loss totale
+            combined_loss = policy_loss + value_loss
+
+            # CORREZIONE: Un solo ciclo backward/step
             optimizer.zero_grad()
-            policy_loss.backward()
-            value_loss.backward()
+            combined_loss.backward()
+
+            # CORREZIONE: Gradient clipping DOPO backward() e PRIMA di step()
+            torch.nn.utils.clip_grad_norm_(agent.parameters(), max_norm=0.5)
+
             optimizer.step()
+
+            # Tracking delle loss
             total_policy_loss += policy_loss.item()
             total_value_loss += value_loss.item()
-    return total_policy_loss / ppo_steps, total_value_loss / ppo_steps
+            total_combined_loss += combined_loss.item()
+
+    # Calcola le medie
+    num_batches = len(batch_dataset) * ppo_steps
+    avg_policy_loss = total_policy_loss / num_batches
+    avg_value_loss = total_value_loss / num_batches
+    avg_combined_loss = total_combined_loss / num_batches
+
+    return avg_policy_loss, avg_value_loss, avg_combined_loss

@@ -7,12 +7,12 @@ import gymnasium as gym
 import os, shutil
 import argparse
 import torch
-# from plot import plot_training_results
+#from plot import plot_training_results
 from gymnasium.wrappers import ResizeObservation, FlattenObservation
 
 '''Hyperparameter Setting'''
 parser = argparse.ArgumentParser()
-parser.add_argument('--dvc', type=str, default='cpu', help='running device: cuda or cpu')
+parser.add_argument('--dvc', type=str, default='cuda', help='running device: cuda or cpu')
 parser.add_argument('--EnvIdex', type=int, default=0, help='CP-v1, LLd-v2')
 parser.add_argument('--write', type=str2bool, default=False, help='Use SummaryWriter to record the training')
 parser.add_argument('--render', type=str2bool, default=False, help='Render or Not')
@@ -88,30 +88,34 @@ def main():
         train_rewards = checkpoint.get('train_rewards', [])
         eval_rewards = checkpoint.get('eval_rewards', [])
         agent.total_steps_taken = checkpoint.get('total_steps_taken', 0)
-        print(f'Loading model from step {checkpoint["episode"]}...')
+        print(f'Loading model from step {agent.total_steps_taken}...')
         
 
     if opt.render:
+        #plot_training_results(train_rewards, eval_rewards, opt.save_interval, opt.eval_interval)
         while True:
             ep_r = evaluate_policy(env, agent, turns=1)
             print(f'Env: CarRacing-v3, Episode Reward:{ep_r}')
     else:
         traj_lenth = 0
-        total_steps = 0 if not opt.Loadmodel else checkpoint['episode']
+        total_steps = 0 if not opt.Loadmodel else agent.total_steps_taken
 
         while total_steps < opt.Max_train_steps:
-            s, info = env.reset(seed=env_seed)  # Do not use opt.seed directly, or it can overfit to opt.seed
+            s, info = env.reset(seed=env_seed)
             env_seed += 1
             done = False
             episode_reward = 0
             '''Interact & trian'''
             while not done:
                 '''Interact with Env'''
-                a, logprob_a = agent.select_action(s, deterministic=False) # use stochastic when training
+                a, logprob_a = agent.select_action(s, deterministic=False)
                 s_next, r, dw, tr, info = env.step(a) # dw: dead&win; tr: truncated
                 done = (dw or tr)
                 episode_reward += r 
-
+                
+                if done:
+                    train_rewards.append(episode_reward)
+                
                 '''Store the current transition'''
                 agent.put_data(s, a, r, s_next, logprob_a, done, dw, idx = traj_lenth)
                 s = s_next
@@ -126,7 +130,6 @@ def main():
 
                 '''Record & log'''
                 if total_steps % opt.eval_interval == 0:
-                    train_rewards.append(episode_reward)
                     score = evaluate_policy(eval_env, agent, turns=3)
                     eval_rewards.append(score)
                     # plot_training_results(train_rewards, eval_rewards, opt.save_interval, opt.eval_interval)
@@ -141,7 +144,8 @@ def main():
                 if total_steps % opt.save_interval==0:
                     print(f'Saving model at step {total_steps}...')
                     agent.save(agent.total_steps_taken / opt.T_horizon, train_rewards, eval_rewards)
-
+                    
+                                
         env.close()
         eval_env.close()
         # Plot results

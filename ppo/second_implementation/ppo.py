@@ -10,12 +10,18 @@ class PPO_discrete():
     def __init__(self, **kwargs):
         # Init hyperparameters for PPO agent, just like "self.gamma = opt.gamma, self.lambd = opt.lambd, ..."
         self.__dict__.update(kwargs)
+        
+        # Set exploration parameters
+        self.initial_entropy_coef = self.initial_entropy_coef
+        self.min_entropy_coef = self.min_entropy_coef if hasattr(self, 'min_entropy_coef') else 0.01
+        self.initial_explore_steps = self.initial_explore_steps if hasattr(self, 'initial_explore_steps') else 10000
+        self.total_steps_taken = 0  # Track total steps for exploration scheduling
 
         '''Build Actor and Critic'''
         self.actor = Actor(self.state_dim, self.action_dim, self.net_width).to(self.dvc)
-        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=self.lr)
+        self.actor_optimizer = torch.optim.AdamW(self.actor.parameters(), lr=self.lr)
         self.critic = Critic(self.state_dim, self.net_width).to(self.dvc)
-        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=self.lr)
+        self.critic_optimizer = torch.optim.AdamW(self.critic.parameters(), lr=self.lr)
 
         '''Build Trajectory holder'''
         self.s_hoder = np.zeros((self.T_horizon, self.state_dim), dtype=np.float32)
@@ -40,7 +46,23 @@ class PPO_discrete():
                 return a, pi_a
 
     def train(self):
-        self.entropy_coef *= self.entropy_coef_decay #exploring decay
+        # Update total steps and manage entropy coefficient decay
+        self.total_steps_taken += self.T_horizon
+                
+        # Decay entropy coefficient but don't go below minimum
+        # at 100000 steps, entropy_coed should be 0.2
+        entropy_coef = self.min_entropy_coef + (self.initial_entropy_coef - self.min_entropy_coef) * \
+                            math.exp(-1. * self.total_steps_taken / self.entropy_coef_decay)
+                            
+        # self.entropy_coef *= self.entropy_coef_decay INIZIALMENTE ERA COSI
+        if entropy_coef < self.min_entropy_coef:
+            entropy_coef = self.min_entropy_coef
+         
+        # DA RIMETTERE SE SI VUOLE MANTENERE ALTA ENTROPY COEF   
+        # For very early exploration, maintain high entropy coefficient
+        #if total_steps_taken < self.initial_explore_steps:
+        #    entropy_coef = self.initial_entropy_coef
+        
         '''Prepare PyTorch data from Numpy data'''
         s = torch.from_numpy(self.s_hoder).to(self.dvc)
         a = torch.from_numpy(self.a_hoder).to(self.dvc)
@@ -95,7 +117,7 @@ class PPO_discrete():
 
                 surr1 = ratio * adv[index]
                 surr2 = torch.clamp(ratio, 1 - self.clip_rate, 1 + self.clip_rate) * adv[index]
-                a_loss = -torch.min(surr1, surr2) - self.entropy_coef * entropy
+                a_loss = -torch.min(surr1, surr2) - entropy_coef * entropy
 
                 self.actor_optimizer.zero_grad()
                 a_loss.mean().backward()
@@ -131,8 +153,8 @@ class PPO_discrete():
             'eval_rewards': eval_rewards,
             'actor_optimizer_state_dict': self.actor_optimizer.state_dict(),
             'critic_optimizer_state_dict': self.critic_optimizer.state_dict(),
-            'entropy_coef': self.entropy_coef,
-            'device': str(self.dvc)
+            'device': str(self.dvc),
+            'total_steps_taken': self.total_steps_taken,
         }, latest_path)
 
     def load(self, latest_path):

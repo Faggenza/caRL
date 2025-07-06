@@ -12,7 +12,7 @@ from gymnasium.wrappers import ResizeObservation, FlattenObservation
 
 '''Hyperparameter Setting'''
 parser = argparse.ArgumentParser()
-parser.add_argument('--dvc', type=str, default='cpu', help='running device: cuda or cpu')
+parser.add_argument('--dvc', type=str, default='cuda', help='running device: cuda or cpu')
 parser.add_argument('--EnvIdex', type=int, default=0, help='CP-v1, LLd-v2')
 parser.add_argument('--write', type=str2bool, default=False, help='Use SummaryWriter to record the training')
 parser.add_argument('--render', type=str2bool, default=False, help='Render or Not')

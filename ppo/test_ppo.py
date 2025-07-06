@@ -42,9 +42,9 @@ def test(first_time):
     agent.load_state_dict(checkpoint['model_state_dict'])
 
     train_rewards = checkpoint.get('train_rewards', [])
-    test_rewards = checkpoint.get('test_rewards', [])
-    policy_losses = checkpoint.get('policy_losses', [])
-    value_losses = checkpoint.get('value_losses', [])
+    test_rewards = checkpoint.get('eval_rewards', [])
+    #policy_losses = checkpoint.get('policy_losses', [])
+    #value_losses = checkpoint.get('value_losses', [])
 
     # MODIFICA: passa lo stato preprocessato invece di env e agent separatamente
     episode_reward = evaluate_with_preprocessing(env, agent, device, state)

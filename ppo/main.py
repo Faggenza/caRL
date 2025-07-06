@@ -16,7 +16,7 @@ def run_ppo(resume_from, device, plot_flag):
     policy_losses = []
     value_losses = []
 
-    latest_path = "saved_models/ppo_model.pt"
+    latest_path = "saved_models/ppo_model.pth"
 
     agent, device = create_agent(HIDDEN_DIMENSIONS, DROPOUT, device)
     
@@ -155,5 +155,5 @@ def main():
     env_train.close()
 
 if __name__ == "__main__":
-    main()
-    # test(first_time=True)
+    #main()
+    test(first_time=True)

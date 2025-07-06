@@ -87,7 +87,7 @@ def main():
         checkpoint = agent.load(latest_path="./saved_models/ppo_model.pth")
         train_rewards = checkpoint.get('train_rewards', [])
         eval_rewards = checkpoint.get('eval_rewards', [])
-        total_steps_taken = checkpoint.get('total_steps_taken', 0)
+        agent.total_steps_taken = checkpoint.get('total_steps_taken', 0)
         print(f'Loading model from step {checkpoint["episode"]}...')
         
 
@@ -131,16 +131,16 @@ def main():
                     eval_rewards.append(score)
                     # plot_training_results(train_rewards, eval_rewards, opt.save_interval, opt.eval_interval)
                     if opt.write: writer.add_scalar('ep_r', score, global_step=total_steps)
-                    print(f'EnvName: CarRacing-v3',
-                          f'  Episode: {total_steps // opt.T_horizon}',
+                    print(f'  Episode: {total_steps // opt.T_horizon}',
                           f'  Train Rewards: {train_rewards[-1]:.2f}',
                           f'  Eval Rewards: {score:.2f}',
-                          f'  Total Steps: {total_steps}')
+                          f'  Total Steps: {total_steps}',
+                          f'  Entropy Coef: {agent.entropy_coef:.2f}')
 
                 '''Save model'''
                 if total_steps % opt.save_interval==0:
                     print(f'Saving model at step {total_steps}...')
-                    agent.save(total_steps_taken / opt.T_horizon, train_rewards, eval_rewards)
+                    agent.save(agent.total_steps_taken / opt.T_horizon, train_rewards, eval_rewards)
 
         env.close()
         eval_env.close()

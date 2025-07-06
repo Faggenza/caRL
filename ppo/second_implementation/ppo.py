@@ -15,7 +15,8 @@ class PPO_discrete():
         self.initial_entropy_coef = self.initial_entropy_coef
         self.min_entropy_coef = self.min_entropy_coef if hasattr(self, 'min_entropy_coef') else 0.01
         self.initial_explore_steps = self.initial_explore_steps if hasattr(self, 'initial_explore_steps') else 10000
-        self.total_steps_taken = 0  # Track total steps for exploration scheduling
+        self.total_steps_taken = 0
+        self.entropy_coef = self.initial_entropy_coef
 
         '''Build Actor and Critic'''
         self.actor = Actor(self.state_dim, self.action_dim, self.net_width).to(self.dvc)
@@ -51,12 +52,12 @@ class PPO_discrete():
                 
         # Decay entropy coefficient but don't go below minimum
         # at 100000 steps, entropy_coed should be 0.2
-        entropy_coef = self.min_entropy_coef + (self.initial_entropy_coef - self.min_entropy_coef) * \
+        self.entropy_coef = self.min_entropy_coef + (self.initial_entropy_coef - self.min_entropy_coef) * \
                             math.exp(-1. * self.total_steps_taken / self.entropy_coef_decay)
                             
         # self.entropy_coef *= self.entropy_coef_decay INIZIALMENTE ERA COSI
-        if entropy_coef < self.min_entropy_coef:
-            entropy_coef = self.min_entropy_coef
+        if self.entropy_coef < self.min_entropy_coef:
+            self.entropy_coef = self.min_entropy_coef
          
         # DA RIMETTERE SE SI VUOLE MANTENERE ALTA ENTROPY COEF   
         # For very early exploration, maintain high entropy coefficient
@@ -117,7 +118,7 @@ class PPO_discrete():
 
                 surr1 = ratio * adv[index]
                 surr2 = torch.clamp(ratio, 1 - self.clip_rate, 1 + self.clip_rate) * adv[index]
-                a_loss = -torch.min(surr1, surr2) - entropy_coef * entropy
+                a_loss = -torch.min(surr1, surr2) - self.entropy_coef * entropy
 
                 self.actor_optimizer.zero_grad()
                 a_loss.mean().backward()

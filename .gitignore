@@ -5,3 +5,5 @@ saved_models/*
 .idea
 dqn/dqn_train_32000.txt
 ppo/second_implementation/saved_models/*
+ppo/ppo_3/saved_models
+ppo/ppo_3/plots

@@ -48,7 +48,7 @@ class QNetwork(nn.Module):
         self.fc_adv = nn.Linear(512, 256)
 
         self.value = nn.Linear(256, 1)
-        self.adv = nn.Linear(256, 2)
+        self.adv = nn.Linear(256, 5)
 
     def forward(self, state):
         # Ensure state is in the right format: (batch_size, channels, height, width)
@@ -131,7 +131,7 @@ def set_seed(env, seed=42):
         torch.cuda.manual_seed(seed)
 
 def main():
-    env = gym.make('CarRacing-v3', domain_randomize=False, continuous=False, render_mode="rgb_array")
+    env = gym.make('CarRacing-v3', domain_randomize=False, continuous=False, render_mode=render)
 
     set_seed(env)
     
@@ -145,7 +145,6 @@ def main():
 
     epsilon = INITIAL_EPSILON
     learn_steps = 0
-    begin_learn = False
 
     episode_reward = 0
     rewards = []
@@ -170,7 +169,7 @@ def main():
         done = False
         state, _ = env.reset()
         episode_reward = 0
-        for time_steps in range(200):
+        for _ in count():
             p = random.random()
             if p < epsilon:
                 action = random.randint(0, 1)
@@ -219,7 +218,7 @@ def main():
             state = next_state
 
         if epoch % SAVE_INTERVAL == 0:
-            plot_training_progress(scores=rewards, episodes=epoch)
+            plot_training_progress(scores=rewards, episodes=list(range(len(rewards))))
             save_param(rewards, list(range(len(rewards))), epoch, agent.state_dict())
             print('Ep {}\tMoving average score: {:.2f}\tEpsilon: {:.2}\t'.format(epoch, episode_reward, epsilon))
             

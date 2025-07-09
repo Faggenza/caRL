@@ -62,6 +62,7 @@ def plot_test(train_rewards=None, episodes=None):
         ax1.legend()
 
         plt.tight_layout()
+        plt.savefig('./plots/train_rewards_plot_dqn.png')
         plt.show()
 
         print(f"Statistiche finali:")

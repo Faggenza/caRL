@@ -1,3 +1,5 @@
+import math
+
 import gymnasium as gym
 import torch
 import torch.nn as nn
@@ -14,6 +16,9 @@ EXPLORE = 20000
 INITIAL_EPSILON = 0.9
 FINAL_EPSILON = 0.01
 REPLAY_MEMORY = 50000
+EPS_START = 0.9
+EPS_END = 0.01
+EPS_DECAY = 13000
 BATCH = 128
 LR = 1e-4
 UPDATE_STEPS = 4
@@ -197,9 +202,8 @@ def main():
                 loss.backward()
                 optimizer.step()
 
-                if epsilon > FINAL_EPSILON:
-                    #VEDERE COME DECADE
-                    epsilon -= (INITIAL_EPSILON - FINAL_EPSILON) / EXPLORE
+                if epsilon > EPS_END:
+                    epsilon = EPS_END + (EPS_START - EPS_END) * math.exp(-1. * epoch / EPS_DECAY)
 
             if done:
                 rewards.append(episode_reward)

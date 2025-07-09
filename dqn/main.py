@@ -130,16 +130,14 @@ def main(resume_from_checkpoint=False):
             observation, reward, terminated, truncated, _ = env.step(action.item())
             done = terminated or truncated
 
-            if terminated:
-                reward += 100
-            if np.mean(observation[:, :, 1]) > 185.0:
-                reward -= 0.05
-            episode_reward += reward
-            avg_reward = reward_mem(reward)
-            if avg_reward <= -0.1:
-                done = True
-            if done:
-                break
+            # if terminated:
+            #     reward += 100
+            # if np.mean(observation[:, :, 1]) > 185.0:
+            #     reward -= 0.05
+            # episode_reward += reward
+            # avg_reward = reward_mem(reward)
+            # if avg_reward <= -0.1:
+            #     done = True
 
             reward = torch.tensor([reward], device=device)
 

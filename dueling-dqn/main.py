@@ -13,9 +13,9 @@ GAMMA = 0.99
 EXPLORE = 20000
 INITIAL_EPSILON = 0.9
 FINAL_EPSILON = 0.01
-REPLAY_MEMORY = 50000
+REPLAY_MEMORY = 10000
 BATCH = 128
-LR = 1e-4
+LR = 3e-4
 UPDATE_STEPS = 4
 SAVE_INTERVAL = 10
 
@@ -115,10 +115,21 @@ def save_param(rewards, episodes, i_ep, QNetork):
                 'episodes': episodes,
                 'i_ep': i_ep
                 }, path)
+    
+def set_seed(env, seed=42):
+    random.seed(seed)
+    torch.manual_seed(seed)
+    env.reset(seed=seed)
+    env.action_space.seed(seed)
+    env.observation_space.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
 
 def main():
     env = gym.make('CarRacing-v3', domain_randomize=False, continuous=False, render_mode="rgb_array")
 
+    set_seed(env)
+    
     onlineQNetwork = QNetwork().to(device)
     targetQNetwork = QNetwork().to(device)
     targetQNetwork.load_state_dict(onlineQNetwork.state_dict())
@@ -171,11 +182,9 @@ def main():
             episode_reward += reward
             memory_replay.add((state, next_state, action, reward, done))
             if memory_replay.size() > 128:
-                if begin_learn is False:
-                    print('Init learning!')
-                    begin_learn = True
                 learn_steps += 1
                 if learn_steps % UPDATE_STEPS == 0:
+                    print("Update at epoch: ", epoch)
                     targetQNetwork.load_state_dict(onlineQNetwork.state_dict())
                 batch = memory_replay.sample(BATCH, False)
                 batch_state, batch_next_state, batch_action, batch_reward, batch_done = zip(*batch)

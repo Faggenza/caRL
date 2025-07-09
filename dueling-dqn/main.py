@@ -1,3 +1,5 @@
+import math
+
 import gymnasium as gym
 import torch
 import torch.nn as nn
@@ -14,6 +16,9 @@ EXPLORE = 20000
 INITIAL_EPSILON = 0.9
 FINAL_EPSILON = 0.01
 REPLAY_MEMORY = 10000
+EPS_START = 0.9
+EPS_END = 0.01
+EPS_DECAY = 65
 BATCH = 128
 LR = 3e-4
 UPDATE_STEPS = 4
@@ -130,11 +135,11 @@ def main():
 
     set_seed(env)
     
-    onlineQNetwork = QNetwork().to(device)
-    targetQNetwork = QNetwork().to(device)
-    targetQNetwork.load_state_dict(onlineQNetwork.state_dict())
+    agent = QNetwork().to(device)
+    valueNetwork = QNetwork().to(device)
+    valueNetwork.load_state_dict(agent.state_dict())
 
-    optimizer = torch.optim.AdamW(onlineQNetwork.parameters(), LR)
+    optimizer = torch.optim.AdamW(agent.parameters(), LR)
 
     memory_replay = Memory(REPLAY_MEMORY)
 
@@ -152,7 +157,7 @@ def main():
             checkpoint = torch.load(path, map_location=device)
             rewards = checkpoint['rewards']
             initial_ep = checkpoint['i_ep'] + 1 
-            onlineQNetwork.load_state_dict(checkpoint['dueling-dqn-param'])
+            agent.load_state_dict(checkpoint['dueling-dqn-param'])
             print(f'Loaded model at episode {initial_ep}')
         except FileNotFoundError:
             print('No saved model found - starting fresh')
@@ -171,7 +176,7 @@ def main():
                 action = random.randint(0, 1)
             else:
                 tensor_state = torch.FloatTensor(state).unsqueeze(0).to(device)
-                action = onlineQNetwork.select_action(tensor_state)
+                action = agent.select_action(tensor_state)
             next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
             if terminated:
@@ -184,8 +189,7 @@ def main():
             if memory_replay.size() > 128:
                 learn_steps += 1
                 if learn_steps % UPDATE_STEPS == 0:
-                    print("Update at epoch: ", epoch)
-                    targetQNetwork.load_state_dict(onlineQNetwork.state_dict())
+                    valueNetwork.load_state_dict(agent.state_dict())
                 batch = memory_replay.sample(BATCH, False)
                 batch_state, batch_next_state, batch_action, batch_reward, batch_done = zip(*batch)
 
@@ -196,19 +200,18 @@ def main():
                 batch_done = torch.FloatTensor(np.array(batch_done)).unsqueeze(1).to(device)
 
                 with torch.no_grad():
-                    onlineQ_next = onlineQNetwork(batch_next_state)
-                    targetQ_next = targetQNetwork(batch_next_state)
+                    onlineQ_next = agent(batch_next_state)
+                    targetQ_next = valueNetwork(batch_next_state)
                     online_max_action = torch.argmax(onlineQ_next, dim=1, keepdim=True)
                     y = batch_reward + (1 - batch_done) * GAMMA * targetQ_next.gather(1, online_max_action.long())
 
-                loss = F.mse_loss(onlineQNetwork(batch_state).gather(1, batch_action.long()), y)
+                loss = F.mse_loss(agent(batch_state).gather(1, batch_action.long()), y)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
 
-                if epsilon > FINAL_EPSILON:
-                    #VEDERE COME DECADE
-                    epsilon -= (INITIAL_EPSILON - FINAL_EPSILON) / EXPLORE
+                if epsilon > EPS_END:
+                    epsilon = EPS_END + (EPS_START - EPS_END) * math.exp(-1. * epoch / EPS_DECAY)
 
             if done:
                 rewards.append(episode_reward)
@@ -217,7 +220,7 @@ def main():
 
         if epoch % SAVE_INTERVAL == 0:
             plot_training_progress(scores=rewards, episodes=epoch)
-            save_param(rewards, list(range(len(rewards))), epoch, onlineQNetwork.state_dict())
+            save_param(rewards, list(range(len(rewards))), epoch, agent.state_dict())
             print('Ep {}\tMoving average score: {:.2f}\tEpsilon: {:.2}\t'.format(epoch, episode_reward, epsilon))
             
 if __name__ == "__main__":

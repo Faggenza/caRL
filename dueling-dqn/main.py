@@ -19,7 +19,7 @@ REPLAY_MEMORY = 10000
 EPS_START = 0.9
 EPS_END = 0.01
 EPS_DECAY = 65
-BATCH = 128
+BATCH = 32
 LR = 3e-4
 UPDATE_STEPS = 4
 SAVE_INTERVAL = 10
@@ -220,7 +220,7 @@ def main():
         if epoch % SAVE_INTERVAL == 0:
             plot_training_progress(scores=rewards, episodes=list(range(len(rewards))))
             save_param(rewards, list(range(len(rewards))), epoch, agent.state_dict())
-            print('Ep {}\tMoving average score: {:.2f}\tEpsilon: {:.2}\t'.format(epoch, episode_reward, epsilon))
+            print('Ep {}\tLast score: {:.2f}\tEpsilon: {:.2}\t'.format(epoch, episode_reward, epsilon))
             
 if __name__ == "__main__":
     main()

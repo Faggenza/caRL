@@ -67,4 +67,6 @@ def test(first_time):
             break
 
         state = torch.tensor(observation.flatten(), dtype=torch.float32, device=device).unsqueeze(0)
+    print(f"Test finished after {t + 1} timesteps with total reward: {test_rewards:.2f}")
+    env.close()
     return test_rewards

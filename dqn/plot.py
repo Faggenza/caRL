@@ -48,7 +48,7 @@ def plot_test(train_rewards=None, episodes=None):
         ax1.plot(episodes, train_rewards, 'b-', linewidth=1, alpha=0.7, label='Valori originali')
 
         # Media mobile di tutto il plot per i rewards
-        window_size = min(len(train_rewards) // 10, 50)  # Finestra del 10% dei dati, max 50
+        window_size = min(len(train_rewards) // 10, 200)  # Finestra del 10% dei dati, max 50
         if window_size > 1:
             moving_avg = np.convolve(train_rewards, np.ones(window_size) / window_size, mode='valid')
             # Allinea gli episodi con la media mobile

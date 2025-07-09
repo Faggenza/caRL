@@ -158,3 +158,4 @@ if __name__ == "__main__":
                 break
 
         print(f'Ep {i_ep}\tScore: {score:.2f}\t')
+

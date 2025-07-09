@@ -139,8 +139,8 @@ class Agent():
     """
     max_grad_norm = 0.5
     clip_param = 0.2
-    ppo_epoch = 10
-    buffer_capacity, batch_size = 2000, 128
+    ppo_epoch = 8
+    buffer_capacity, batch_size = 2000, 256
 
     def __init__(self, action_dim):
         self.training_step = 0
@@ -179,12 +179,7 @@ class Agent():
 
     def load_param(self):
         checkpoint = torch.load('saved_models/ppo_net_params_discrete.pkl', map_location=device)
-        # Se il checkpoint contiene il nuovo formato con dizionario
-        if isinstance(checkpoint, dict) and 'ppo_net_params_discrete' in checkpoint:
-            self.net.load_state_dict(checkpoint['ppo_net_params_discrete'])
-        else:
-            # Formato vecchio - solo state_dict
-            self.net.load_state_dict(checkpoint)
+        self.net.load_state_dict(checkpoint['ppo_net_params_discrete'])
 
     def update(self):
         self.training_step += 1

@@ -78,6 +78,7 @@ def plot_training_progress(scores=None, running_scores=None, episodes=None):
         # Calcola una media mobile aggiuntiva per smoothing se ci sono abbastanza dati
         if len(scores) > 20:
             window_size = 200  
+            window_size = 200 #min(len(scores) // 20, 200)  # Finestra del 10% dei dati, max 50
             if window_size > 1:
                 moving_avg = np.convolve(scores, np.ones(window_size) / window_size, mode='valid')
                 episodes_aligned = episodes[window_size - 1:]

@@ -12,7 +12,7 @@ from utils import DrawLine, plot_training_progress
 
 parser = argparse.ArgumentParser(description='Train a PPO agent for the CarRacing-v0')
 parser.add_argument('--gamma', type=float, default=0.99, metavar='G', help='discount factor (default: 0.99)')
-parser.add_argument('--load', type=bool, default=False)
+parser.add_argument('--load', type=bool, default=True)
 parser.add_argument('--action-repeat', type=int, default=8, metavar='N', help='repeat action in N frames (default: 8)')
 parser.add_argument('--img-stack', type=int, default=4, metavar='N', help='stack N image in a state (default: 4)')
 parser.add_argument('--seed', type=int, default=42, metavar='N', help='random seed (default: 0)')

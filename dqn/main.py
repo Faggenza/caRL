@@ -3,6 +3,9 @@ import math
 import random
 from itertools import count
 import os
+
+import numpy as np
+
 from test_dqn import test_model, test
 from plot import plot_test
 from train import optimize_model
@@ -64,7 +67,7 @@ def main(resume_from_checkpoint=False):
     GAMMA = 0.99
     EPS_START = 0.9
     EPS_END = 0.01
-    EPS_DECAY = 32000
+    EPS_DECAY = 65000
     TAU = 0.005
     LR = 3e-4
     NUM_EPISODES = 1000
@@ -121,13 +124,24 @@ def main(resume_from_checkpoint=False):
         state = torch.tensor(state.flatten(), dtype=torch.float32, device=device).unsqueeze(0)
         episode_reward = 0
 
-        for t in count():
+        for _ in count():
             steps_done+= 1
             action = select_action(state, steps_done)
             observation, reward, terminated, truncated, _ = env.step(action.item())
-            reward = torch.tensor([reward], device=device)
-            episode_reward += reward.item()
             done = terminated or truncated
+
+            if terminated:
+                reward += 100
+            if np.mean(observation[:, :, 1]) > 185.0:
+                reward -= 0.05
+            episode_reward += reward
+            avg_reward = reward_mem(reward)
+            if avg_reward <= -0.1:
+                done = True
+            if done:
+                break
+
+            reward = torch.tensor([reward], device=device)
 
             if terminated:
                 next_state = None
@@ -186,6 +200,24 @@ def main(resume_from_checkpoint=False):
 
 
 if __name__ == "__main__":
+
+    def reward_memory():
+        count = 0
+        length = 100
+        history = np.zeros(length)
+
+        def memory(reward):
+            nonlocal count
+            history[count] = reward
+            count = (count + 1) % length
+            return np.mean(history)
+
+        return memory
+
+
+    # Inizializza la funzione di memoria dei reward
+    reward_mem = reward_memory()
     #main(resume_from_checkpoint=True)
     test(first_time=True)
+
 

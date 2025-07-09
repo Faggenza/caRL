@@ -135,8 +135,8 @@ class Agent():
         return action
 
     def load_param(self):
-        self.net.load_state_dict(torch.load('saved_models/ppo_net_params_discrete.pkl', map_location=device))
-
+        checkpoint = torch.load('saved_models/ppo_net_params_discrete.pkl', map_location=device)
+        self.net.load_state_dict(checkpoint['ppo_net_params_discrete'])
 
 if __name__ == "__main__":
     env = Env()

@@ -12,7 +12,8 @@ from utils import DrawLine, plot_training_progress
 
 parser = argparse.ArgumentParser(description='Train a PPO agent for the CarRacing-v0')
 parser.add_argument('--gamma', type=float, default=0.99, metavar='G', help='discount factor (default: 0.99)')
-parser.add_argument('--load', type=bool, default=True)
+parser.add_argument('--gae-lambda', type=float, default=0.95, metavar='L', help='GAE lambda parameter (default: 0.95)')
+parser.add_argument('--load', type=bool, default=False)
 parser.add_argument('--action-repeat', type=int, default=8, metavar='N', help='repeat action in N frames (default: 8)')
 parser.add_argument('--img-stack', type=int, default=4, metavar='N', help='stack N image in a state (default: 4)')
 parser.add_argument('--seed', type=int, default=42, metavar='N', help='random seed (default: 0)')
@@ -30,7 +31,7 @@ if use_cuda:
     torch.cuda.manual_seed(args.seed)
 
 transition = np.dtype([('s', np.float64, (args.img_stack, 96, 96)), ('a', np.int64), ('a_logp', np.float64),
-                       ('r', np.float64), ('s_', np.float64, (args.img_stack, 96, 96))])
+                       ('r', np.float64), ('s_', np.float64, (args.img_stack, 96, 96)), ('done', np.bool_)])
 
 
 class Env():
@@ -183,17 +184,38 @@ class Agent():
 
     def update(self):
         self.training_step += 1
-        s = torch.tensor(self.buffer['s'], dtype=torch.double).to(device)
-        a = torch.tensor(self.buffer['a'], dtype=torch.long).to(device).view(-1, 1)
-        r = torch.tensor(self.buffer['r'], dtype=torch.double).to(device).view(-1, 1)
-        s_ = torch.tensor(self.buffer['s_'], dtype=torch.double).to(device)
-        old_a_logp = torch.tensor(self.buffer['a_logp'], dtype=torch.double).to(device).view(-1, 1)
+        # Copy arrays to fix memory alignment issues
+        s = torch.tensor(self.buffer['s'].copy(), dtype=torch.double).to(device)
+        a = torch.tensor(self.buffer['a'].copy(), dtype=torch.long).to(device).view(-1, 1)
+        r = torch.tensor(self.buffer['r'].copy(), dtype=torch.double).to(device).view(-1, 1)
+        s_ = torch.tensor(self.buffer['s_'].copy(), dtype=torch.double).to(device)
+        done = torch.tensor(self.buffer['done'].copy(), dtype=torch.bool).to(device).view(-1, 1)
+        old_a_logp = torch.tensor(self.buffer['a_logp'].copy(), dtype=torch.double).to(device).view(-1, 1)
 
         with torch.no_grad():
-            _, target_v = self.net(s_)
-            target_v = r + args.gamma * target_v
-            _, v = self.net(s)
-            adv = (target_v - v).detach()
+            _, values = self.net(s)
+            _, next_values = self.net(s_)
+            
+            # Compute GAE advantages
+            advantages = torch.zeros_like(r)
+            returns = torch.zeros_like(r)
+            
+            gae = 0
+            for step in reversed(range(self.buffer_capacity)):
+                if step == self.buffer_capacity - 1:
+                    next_non_terminal = 1.0 - done[step].float()
+                    next_value = next_values[step]
+                else:
+                    next_non_terminal = 1.0 - done[step].float()
+                    next_value = values[step + 1]
+                
+                delta = r[step] + args.gamma * next_value * next_non_terminal - values[step]
+                gae = delta + args.gamma * args.gae_lambda * next_non_terminal * gae
+                advantages[step] = gae
+                returns[step] = gae + values[step]
+            
+            # Normalize advantages
+            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
         for _ in range(self.ppo_epoch):
             for index in BatchSampler(SubsetRandomSampler(range(self.buffer_capacity)), self.batch_size, False):
@@ -202,14 +224,15 @@ class Agent():
                 a_logp = dist.log_prob(a[index].squeeze()).view(-1, 1)
                 ratio = torch.exp(a_logp - old_a_logp[index])
 
-                surr1 = ratio * adv[index]
-                surr2 = torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * adv[index]
+                surr1 = ratio * advantages[index]
+                surr2 = torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * advantages[index]
                 action_loss = -torch.min(surr1, surr2).mean()
-                value_loss = F.smooth_l1_loss(value, target_v[index])
-                loss = action_loss + 2. * value_loss
+                value_loss = F.mse_loss(value, returns[index])
+                loss = action_loss + 0.5 * value_loss
 
                 self.optimizer.zero_grad()
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.net.parameters(), self.max_grad_norm)
                 self.optimizer.step()
 
 
@@ -258,7 +281,7 @@ if __name__ == "__main__":
             state_, reward, done, die = env.step(action)
             if args.render:
                 env.render()
-            if agent.store((state, action, a_logp, reward, state_)):
+            if agent.store((state, action, a_logp, reward, state_, done)):
                 print('updating')
                 agent.update()
             score += reward

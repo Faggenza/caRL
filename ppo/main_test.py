@@ -3,6 +3,7 @@ import numpy as np
 import gymnasium as gym
 import torch
 import torch.nn as nn
+from utils import plot_training_progress
 
 parser = argparse.ArgumentParser(description='Test the PPO agent for the CarRacing-v0')
 parser.add_argument('--action-repeat', type=int, default=8, metavar='N', help='repeat action in N frames (default: 8)')
@@ -135,14 +136,24 @@ class Agent():
         return action
 
     def load_param(self):
-        checkpoint = torch.load('saved_models/ppo_net_params_discrete.pkl', map_location=device)
+        checkpoint = torch.load('ppo_3/saved_models/ppo_net_params_discrete_1850ep_BEST.pkl', map_location=device)
         self.net.load_state_dict(checkpoint['ppo_net_params_discrete'])
 
 if __name__ == "__main__":
     env = Env()
     agent = Agent(env.action_dim)
     agent.load_param()
+    checkpoint = torch.load('ppo_3/saved_models/ppo_net_params_discrete_1850ep_BEST.pkl', map_location=device)
 
+    if isinstance(checkpoint, dict) and 'scores' in checkpoint:
+        all_scores = checkpoint['scores']
+        all_running_scores = checkpoint['running_scores']
+        all_episodes = checkpoint['episodes']
+
+        plot_training_progress(all_scores, all_running_scores, all_episodes)
+
+
+    avg_score = 0
     for i_ep in range(10):
         score = 0
         state = env.reset()
@@ -157,5 +168,8 @@ if __name__ == "__main__":
             if done or die:
                 break
 
+        avg_score += score
+
         print(f'Ep {i_ep}\tScore: {score:.2f}\t')
+    print(f'Average Test Score: {avg_score / 10:.2f}')
 

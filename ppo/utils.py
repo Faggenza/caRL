@@ -77,12 +77,12 @@ def plot_training_progress(scores=None, running_scores=None, episodes=None):
 
         # Calcola una media mobile aggiuntiva per smoothing se ci sono abbastanza dati
         if len(scores) > 20:
-            window_size = min(len(scores) // 30, 200)  # Finestra del 30% dei dati, max 200
+            window_size = 200  # Finestra del 30% dei dati, max 200
             if window_size > 1:
                 moving_avg = np.convolve(scores, np.ones(window_size) / window_size, mode='valid')
                 episodes_aligned = episodes[window_size - 1:]
-                ax1.plot(episodes_aligned, moving_avg, 'g--', linewidth=1.5, alpha=0.8,
-                         label=f'Media mobile aggiuntiva ({window_size} episodi)')
+                ax1.plot(episodes_aligned, moving_avg, 'r-', linewidth=1.5, alpha=0.8,
+                         label=f'Media mobile ({window_size} episodi)')
 
         ax1.set_xlabel('Episodi')
         ax1.set_ylabel('Score')
@@ -109,7 +109,7 @@ def plot_training_progress(scores=None, running_scores=None, episodes=None):
             os.makedirs('plots')
         filepath = os.path.join('plots', 'ppo_training_progress.png')
         fig.savefig(filepath, dpi=300, bbox_inches='tight')
-        # plt.show()
+        plt.show()
         plt.close(fig)
 
     else:

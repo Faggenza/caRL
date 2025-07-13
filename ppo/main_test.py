@@ -149,11 +149,12 @@ if __name__ == "__main__":
         all_scores = checkpoint['scores']
         all_running_scores = checkpoint['running_scores']
         all_episodes = checkpoint['episodes']
+        i_ep = checkpoint['i_ep']
 
         plot_training_progress(all_scores, all_running_scores, all_episodes)
 
 
-    avg_score = 0
+    test_rewards = []
     for i_ep in range(10):
         score = 0
         state = env.reset()
@@ -168,8 +169,20 @@ if __name__ == "__main__":
             if done or die:
                 break
 
-        avg_score += score
+        test_rewards.append(score)
 
         print(f'Ep {i_ep}\tScore: {score:.2f}\t')
-    print(f'Average Test Score: {avg_score / 10:.2f}')
+
+    avg_reward = np.mean(test_rewards)
+    std_reward = np.std(test_rewards)
+    max_reward = np.max(test_rewards)
+    min_reward = np.min(test_rewards)
+
+    print(f"\n=== TEST RESULTS ===")
+    print(f"Episodes tested: {10}")
+    print(f"Average reward: {avg_reward:.2f} ± {std_reward:.2f}")
+    print(f"Max reward: {max_reward:.2f}")
+    print(f"Min reward: {min_reward:.2f}")
+    print(f"Training episodes: {i_ep}")
+    print(f"Training average (last 100 episodes): {np.mean(all_scores[-100:]):.2f}")
 

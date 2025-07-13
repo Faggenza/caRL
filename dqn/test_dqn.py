@@ -1,22 +1,14 @@
 import gymnasium as gym
 import torch
+import numpy as np
 from itertools import count
 from q_network import DQN
 
-NUM_TEST = 5
-
-def test_model():
-    test_reward = 0
-    first_time = True
-    for i in range(NUM_TEST):
-        test_reward += test(first_time)
-        first_time = False
-    test_reward /= NUM_TEST
-    print(f"Average test reward over {NUM_TEST} runs: {test_reward:.2f}")
+NUM_TEST = 10
 
 
 def test(first_time):
-    latest_path = "saved_models/dqn_model.pt"
+    latest_path = "saved_models/dqn_model_512_65k_700ep.pt"
     device = torch.device(
         "cuda" if torch.cuda.is_available() else
         "mps" if torch.backends.mps.is_available() else
@@ -54,19 +46,50 @@ def test(first_time):
         plot_test(train_rewards, episodes)
 
     # Test dell'agente
-    state, _ = env.reset()
-    state = torch.tensor(state.flatten(), dtype=torch.float32, device=device).unsqueeze(0)
-    test_rewards = 0
-    for t in count():
-        action = policy_net(state).max(1).indices.view(1, 1)
-        observation, reward, terminated, truncated, _ = env.step(action.item())
-        test_rewards += reward
-        done = terminated or truncated
+    test_rewards = []
 
-        if done:
-            break
+    for episode in range(NUM_TEST):
+        state, _ = env.reset()
+        episode_reward = 0
+        done = False
+        step_count = 0
 
-        state = torch.tensor(observation.flatten(), dtype=torch.float32, device=device).unsqueeze(0)
-    print(f"Test finished after {t + 1} timesteps with total reward: {test_rewards:.2f}")
+        while not done:
+            # Usa solo la policy greedy (no epsilon-greedy)
+            tensor_state = torch.FloatTensor(state.flatten()).unsqueeze(0).to(device)
+            with torch.no_grad():
+                action = policy_net(tensor_state).max(1).indices.view(1, 1)
+
+            next_state, reward, terminated, truncated, _ = env.step(action.item())
+            done = terminated or truncated
+
+            episode_reward += reward
+            step_count += 1
+            state = next_state
+
+            # Limite di sicurezza per evitare loop infiniti
+            if step_count > 2000:
+                print(f"Episode {episode + 1} stopped after {step_count} steps")
+                break
+
+        test_rewards.append(episode_reward)
+        print(f"Episode {episode + 1}/{NUM_TEST}: Score = {episode_reward:.2f}, Steps = {step_count}")
+
     env.close()
+
+    # Statistiche finali
+    avg_reward = np.mean(test_rewards)
+    std_reward = np.std(test_rewards)
+    max_reward = np.max(test_rewards)
+    min_reward = np.min(test_rewards)
+
+    print(f"\n=== TEST RESULTS ===")
+    print(f"Episodes tested: {NUM_TEST}")
+    print(f"Average reward: {avg_reward:.2f} ± {std_reward:.2f}")
+    print(f"Max reward: {max_reward:.2f}")
+    print(f"Min reward: {min_reward:.2f}")
+    print(f"Training episodes: {episodes}")
+    print(f"Training average (last 100 episodes): {np.mean(train_rewards[-100:]):.2f}")
+
+
     return test_rewards

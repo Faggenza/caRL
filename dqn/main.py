@@ -6,7 +6,7 @@ import os
 
 import numpy as np
 
-from test_dqn import test_model, test
+from test_dqn import test
 from plot import plot_test
 from train import optimize_model
 import torch
@@ -79,11 +79,11 @@ def main(resume_from_checkpoint=False):
     state, info = env.reset()
     n_observations = state.flatten().shape[0]  # Appiattisce l'immagine e conta tutti i pixel
 
-    policy_net = DQN(n_observations, n_actions).to(device)
+    q_net = DQN(n_observations, n_actions).to(device)
     target_net = DQN(n_observations, n_actions).to(device)
-    target_net.load_state_dict(policy_net.state_dict())
+    target_net.load_state_dict(q_net.state_dict())
 
-    optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
+    optimizer = optim.AdamW(q_net.parameters(), lr=LR, amsgrad=True)
     memory = ReplayMemory(10000)
 
     steps_done = 0
@@ -94,7 +94,7 @@ def main(resume_from_checkpoint=False):
         try:
             checkpoint = torch.load(latest_path, map_location=device, weights_only=False)
             start_episode = checkpoint['episode'] + 1
-            policy_net.load_state_dict(checkpoint['model_state_dict'])
+            q_net.load_state_dict(checkpoint['model_state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             steps_done = checkpoint.get('steps_done', 0)
             episode_durations = checkpoint.get('episode_durations', [])
@@ -109,12 +109,15 @@ def main(resume_from_checkpoint=False):
         eps_threshold = EPS_END + (EPS_START - EPS_END) * \
             math.exp(-1. * steps_done / EPS_DECAY)
 
+        if eps_threshold < EPS_END:
+            eps_threshold = EPS_END
+
         if sample > eps_threshold:
             with torch.no_grad():
                 # t.max(1) will return the largest column value of each row.
                 # second column on max result is index of where max element was
                 # found, so we pick action with the larger expected reward.
-                return policy_net(state).max(1).indices.view(1, 1)
+                return q_net(state).max(1).indices.view(1, 1)
         else:
             return torch.tensor([[env.action_space.sample()]], device=device, dtype=torch.long)
 
@@ -152,20 +155,13 @@ def main(resume_from_checkpoint=False):
             state = next_state
 
             # Perform one step of the optimization (on the policy network)
-            optimize_model(
-                memory=memory,
-                policy_net=policy_net,
-                target_net=target_net,
-                optimizer=optimizer,
-                device=device,
-                batch_size=BATCH_SIZE,
-                gamma=GAMMA
-            )
+            optimize_model(memory=memory, q_net=q_net, target_net=target_net, optimizer=optimizer, device=device,
+                           batch_size=BATCH_SIZE, gamma=GAMMA)
 
             # Soft update of the target network's weights
             # θ′ ← τ θ + (1 −τ )θ′
             target_net_state_dict = target_net.state_dict()
-            policy_net_state_dict = policy_net.state_dict()
+            policy_net_state_dict = q_net.state_dict()
             for key in policy_net_state_dict:
                 target_net_state_dict[key] = policy_net_state_dict[key]*TAU + target_net_state_dict[key]*(1-TAU)
             target_net.load_state_dict(target_net_state_dict)
@@ -187,8 +183,9 @@ def main(resume_from_checkpoint=False):
 
         if i_episode % 5 == 0:
             print(f'Episode {i_episode}: 'f'Train reward: {train_rewards[-1]:.2f} |'  f' Epsilon: {eps_threshold:.4f}')
+
         if i_episode % TEST_INTERVAL == 0:
-            test_model()
+            test(first_time=True)
 
     print('Complete')
     if plot_flag:

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from memory import Transition
 
-def optimize_model(memory, policy_net, target_net, optimizer, device, batch_size, gamma):
+def optimize_model(memory, q_net, target_net, optimizer, device, batch_size, gamma):
     if len(memory) < batch_size:
         return None, None, None
     transitions = memory.sample(batch_size)
@@ -24,7 +24,7 @@ def optimize_model(memory, policy_net, target_net, optimizer, device, batch_size
     # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
     # columns of actions taken. These are the actions which would've been taken
     # for each batch state according to policy_net
-    state_action_values = policy_net(state_batch).gather(1, action_batch)
+    state_action_values = q_net(state_batch).gather(1, action_batch)
 
     # Compute V(s_{t+1}) for all next states.
     # Expected values of actions for non_final_next_states are computed based
@@ -45,6 +45,6 @@ def optimize_model(memory, policy_net, target_net, optimizer, device, batch_size
     optimizer.zero_grad()
     loss.backward()
     # In-place gradient clipping
-    torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
+    torch.nn.utils.clip_grad_value_(q_net.parameters(), 100)
     optimizer.step()
 

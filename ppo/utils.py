@@ -54,7 +54,7 @@ class DrawLine:
         plt.close(self.fig)
 
 
-def plot_training_progress(scores=None, running_scores=None, episodes=None):
+def plot_training_progress(scores=None, episodes=None):
     """
     Plotta lo score e la media mobile durante il training PPO.
 
@@ -66,14 +66,11 @@ def plot_training_progress(scores=None, running_scores=None, episodes=None):
     import matplotlib.pyplot as plt
     import numpy as np
 
-    if scores and running_scores and episodes:
+    if scores and episodes:
         fig, ax1 = plt.subplots(1, 1, figsize=(12, 8))
 
         # Plot degli score originali
-        ax1.plot(episodes, scores, 'b-', linewidth=1, alpha=0.7, label='Score episodio')
-
-        # Plot della media mobile (running_score)
-        # ax1.plot(episodes, running_scores, 'r-', linewidth=2, label='Media mobile (running score)')
+        ax1.plot(episodes, scores, 'b-', linewidth=1, alpha=0.7, label='Valori originali')
 
         # Calcola una media mobile aggiuntiva per smoothing se ci sono abbastanza dati
         if len(scores) > 20:
@@ -85,24 +82,10 @@ def plot_training_progress(scores=None, running_scores=None, episodes=None):
                          label=f'Media mobile ({window_size} episodi)')
 
         ax1.set_xlabel('Episodi')
-        ax1.set_ylabel('Score')
-        ax1.set_title('PPO Training Progress - Score e Media Mobile')
+        ax1.set_ylabel('Train Reward')
+        ax1.set_title('Train Rewards durante il Training')
         ax1.grid(True, alpha=0.3)
         ax1.legend()
-
-        # Aggiungi statistiche come testo sul grafico
-        if len(scores) > 0:
-            last_episodes = min(100, len(scores))
-            recent_avg = np.mean(scores[-last_episodes:])
-            recent_running_avg = running_scores[-1] if running_scores else 0
-
-            stats_text = f"Ultimi {last_episodes} episodi:\n"
-            stats_text += f"Score medio: {recent_avg:.2f}\n"
-            stats_text += f"Running score: {recent_running_avg:.2f}\n"
-            stats_text += f"Score massimo: {max(scores):.2f}"
-
-            ax1.text(0.02, 0.98, stats_text, transform=ax1.transAxes,
-                     verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
 
         plt.tight_layout()
         if not os.path.exists('plots'):

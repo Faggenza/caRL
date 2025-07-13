@@ -27,7 +27,7 @@ def plot_training_progress(scores=None, episodes=None):
                 moving_avg = np.convolve(scores, np.ones(window_size) / window_size, mode='valid')
                 episodes_aligned = episodes[window_size - 1:]
                 ax1.plot(episodes_aligned, moving_avg, 'r-', linewidth=1.5, alpha=0.8,
-                         label=f'Media mobile aggiuntiva ({window_size} episodi)')
+                         label=f'Media mobile ({window_size} episodi)')
 
         ax1.set_xlabel('Episodi')
         ax1.set_ylabel('Score')

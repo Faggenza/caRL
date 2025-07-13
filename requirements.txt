@@ -1,8 +1,10 @@
-# gymnasium==1.1 via pip
-# opencv-python via pip
-pytorch==2.1
+setuptools
+wheel
+swig
+gymnasium==1.1
+opencv-python
+torch==2.1
 matplotlib
-numpy
-pandas
-gymnasium-box2d
-conda-forge::box2d-py
+numpy==1.26
+pandas==2.2
+"gymnasium-box2d"

@@ -1,3 +1,0 @@
-DQN
-EPS_DECAY: 2500 no exploration, dopo 200 epoche circa il modello inizia a far stare la macchina sempre ferma
-EPS_DECAY: 65000 exploration, il modello raggiunge buone prestazioni con 500 epoche

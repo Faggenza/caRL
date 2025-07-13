@@ -26,13 +26,15 @@ def parse_args():
     parser.add_argument("--print_interval", type=int, default=10, help="Interval for printing training progress")
     
     
-    # DQN specific hyperparameters
+    # DQN/Dueling specific hyperparameters
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor for future rewards")
     parser.add_argument("--epsilon_start", type=float, default=0.9, help="Starting value of epsilon for epsilon-greedy policy")
     parser.add_argument("--epsilon_end", type=float, default=0.01, help="Final value of epsilon for epsilon-greedy policy")
     parser.add_argument("--epsilon_decay", type=float, default=65000, help="Decay rate of epsilon")
     parser.add_argument("--tau", type=float, default=0.005, help="Rate for soft update of target network")
     parser.add_argument("--replay_memory_size", type=int, default=10000, help="Size of replay memory")
+    # Just for Dueling DQN
+    parser.add_argument("--update_steps", type=int, default=4, help="Number of steps to update the network")
     
     # Model parameters
     parser.add_argument("--model_path", type=str, default="saved_models/model.pt", help="Path to save/load model")
@@ -53,6 +55,7 @@ def train(args, env, device):
             print(f"  Learning Rate: {args.learning_rate}")
             print(f"  Replay Memory Size: {args.replay_memory_size}")
             print(f"  Test Interval: {args.test_interval}")
+            print(f"  Test Episodes: {args.test_episodes}")
             print(f"  Print Interval: {args.print_interval}")
             print(f"  Training Epochs: {args.epochs}")
             from dqn.train_dqn import train_dqn
@@ -63,10 +66,34 @@ def train(args, env, device):
                       learning_rate=args.learning_rate, 
                       replay_memory_size=args.replay_memory_size, 
                       test_interval=args.test_interval,
+                      test_episodes=args.test_episodes,
                       print_interval=args.print_interval,
                       epochs=args.epochs, env=env)
         case "dueling_dqn":
-            return
+            print("Dueling-DQN-specific parameters:")
+            print(f"  Model Path: {args.model_path}")
+            print(f"  Batch Size: {args.batch_size}")
+            print(f"  Gamma (Discount Factor): {args.gamma}")
+            print(f"  Epsilon: {args.epsilon_start} → {args.epsilon_end} (decay: {args.epsilon_decay})")
+            print(f"  Tau (Target Network Update Rate): {args.tau}")
+            print(f"  Learning Rate: {args.learning_rate}")
+            print(f"  Replay Memory Size: {args.replay_memory_size}")
+            print(f"  Update Steps: {args.update_steps}")
+            print(f"  Test Interval: {args.test_interval}")
+            print(f"  Test Episodes: {args.test_episodes}")
+            print(f"  Print Interval: {args.print_interval}")
+            print(f"  Training Epochs: {args.epochs}")
+            from dueling_dqn.train_dueling_dqn import train_dueling_dqn
+            train_dueling_dqn(path=args.model_path, device=device,
+                              batch_size=args.batch_size, gamma=args.gamma,
+                              epsilon_start=args.epsilon_start, epsilon_end=args.epsilon_end,
+                              epsilon_decay=args.epsilon_decay, tau=args.tau,
+                              learning_rate=args.learning_rate,
+                              replay_memory_size=args.replay_memory_size,
+                              epochs=args.epochs, update_steps=args.update_steps,
+                              test_interval=args.test_interval,
+                              test_episodes=args.test_episodes,
+                              print_interval=args.print_interval, env=env)
         case "ppo":
             return
         case _:
@@ -79,7 +106,7 @@ def test(args, env, device):
     print("Starting testing:")
     print(f"  Test episodes: {args.test_episodes}")
     print(f"  Model path: {args.load}")
-    
+    print(f"  Algorithm: {args.algorithm}")
     match args.algorithm:
         case "dqn":
             from dqn.test_dqn import test
@@ -91,7 +118,14 @@ def test(args, env, device):
                  train_rewards=train_rewards, num_episodes=args.test_episodes, env=env)
             plot_training_progress(scores=train_rewards, episodes=list(range(1, len(train_rewards) + 1)))
         case "dueling_dqn":
-            return
+            from dueling_dqn.test_dueling_dqn import test_dueling
+            from plot import plot_training_progress
+            checkpoint = torch.load(args.load, map_location=torch.device(device))
+            dueling_dqn_param = checkpoint['model_state_dict']
+            train_rewards = checkpoint.get('train_rewards', [])
+            test_dueling(dueling_dqn_param=dueling_dqn_param, train_rewards=train_rewards, device=device,
+                         num_episodes=args.test_episodes, env=env)
+            plot_training_progress(scores=train_rewards, episodes=list(range(1, len(train_rewards) + 1)))
         case "ppo":
             return
     

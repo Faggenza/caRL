@@ -74,7 +74,8 @@ def optimize_model(memory, q_net, target_net, optimizer, device, batch_size, gam
 def train_dqn(path, device, batch_size=128, gamma=0.99, epsilon_start=0.9,
               epsilon_end=0.01, epsilon_decay=65000, tau=0.005,
               learning_rate=3e-4, replay_memory_size=10000, epochs=1000,
-              test_interval=50, print_interval=10 ,env=None):
+              test_interval=50, test_episodes=5,
+              print_interval=10 ,env=None):
     
     def reward_memory():
         count = 0
@@ -103,7 +104,6 @@ def train_dqn(path, device, batch_size=128, gamma=0.99, epsilon_start=0.9,
     memory = ReplayMemory(replay_memory_size)
 
     steps_done = 0
-    start_episode = 1
     episode_durations = []
     train_rewards = []
 
@@ -124,7 +124,7 @@ def train_dqn(path, device, batch_size=128, gamma=0.99, epsilon_start=0.9,
         else:
             return torch.tensor([[env.action_space.sample()]], device=device, dtype=torch.long)
 
-    for i_episode in range(start_episode, epochs + 1):
+    for i_episode in range(1, epochs + 1):
         # Initialize the environment and get its state
         state, info = env.reset()
         state = torch.tensor(state.flatten(), dtype=torch.float32, device=device).unsqueeze(0)
@@ -144,7 +144,7 @@ def train_dqn(path, device, batch_size=128, gamma=0.99, epsilon_start=0.9,
             # avg_reward = reward_mem(reward)
             # if avg_reward <= -0.1:
             #     done = True
-
+            episode_reward += reward
             reward = torch.tensor([reward], device=device)
 
             if terminated:
@@ -186,10 +186,10 @@ def train_dqn(path, device, batch_size=128, gamma=0.99, epsilon_start=0.9,
         eps_threshold = epsilon_end + (epsilon_start - epsilon_end) * math.exp(-1. * steps_done / epsilon_decay)
 
         if i_episode % print_interval == 0:
-            print(f'Episode {i_episode}: 'f'Train reward: {train_rewards[-1]:.2f} |'  f' Epsilon: {eps_threshold:.4f}')
+            print(f'Episode {i_episode}: Train reward: {train_rewards[-1]:.2f} | Epsilon: {eps_threshold:.4f}')
             plot_training_progress(train_rewards, list(range(1, i_episode + 1)))
         if i_episode % test_interval == 0:
-            test(policy_net_state_dict, train_rewards, device, num_episodes=5)
+            test(policy_net_state_dict, train_rewards, device, num_episodes=test_episodes, env=env)
 
-    print('Complete')
     env.close()
+    print('Training finished')

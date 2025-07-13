@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from utils import plot_training_progress
 
-path = 'saved_models/ppo_net_params_discrete.pkl'
+path = '/home/faggi/repo/caRL/fatto/ppo_256b_1400ep_GAE.pkl'
 
 parser = argparse.ArgumentParser(description='Test the PPO agent for the CarRacing-v0')
 parser.add_argument('--action-repeat', type=int, default=8, metavar='N', help='repeat action in N frames (default: 8)')

@@ -5,7 +5,7 @@ import torch
 from plot import plot_training_progress
 from main import QNetwork
 
-path = 'saved_models/dueling_dqn_model.pt'
+path = '/home/faggi/repo/caRL/fatto/dueling_dqn_1us_64b_900.pt'
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def test_saved_model(model_path=None, num_episodes=10):

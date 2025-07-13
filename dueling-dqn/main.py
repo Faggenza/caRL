@@ -19,7 +19,7 @@ REPLAY_MEMORY = 10000
 EPS_START = 0.9
 EPS_END = 0.01
 EPS_DECAY = 65
-BATCH = 32
+BATCH_SIZE = 32
 LR = 3e-4
 TAU = 0.005
 UPDATE_STEPS = 4
@@ -185,7 +185,7 @@ def main():
             if memory_replay.size() > 128:
                 learn_steps += 1
 
-                batch = memory_replay.sample(BATCH, False)
+                batch = memory_replay.sample(BATCH_SIZE, False)
                 batch_state, batch_next_state, batch_action, batch_reward, batch_done = zip(*batch)
 
                 batch_state = torch.FloatTensor(np.array(batch_state)).to(device)

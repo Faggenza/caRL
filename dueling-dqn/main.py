@@ -21,6 +21,7 @@ EPS_END = 0.01
 EPS_DECAY = 65
 BATCH = 32
 LR = 3e-4
+TAU = 0.005
 UPDATE_STEPS = 4
 SAVE_INTERVAL = 10
 
@@ -136,8 +137,8 @@ def main():
     set_seed(env)
     
     agent = QNetwork().to(device)
-    valueNetwork = QNetwork().to(device)
-    valueNetwork.load_state_dict(agent.state_dict())
+    targetNetwork = QNetwork().to(device)
+    targetNetwork.load_state_dict(agent.state_dict())
 
     optimizer = torch.optim.AdamW(agent.parameters(), LR)
 
@@ -178,17 +179,12 @@ def main():
                 action = agent.select_action(tensor_state)
             next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
-            if terminated:
-                reward += 100
-            if np.mean(next_state[:, :, 1]) > 185.0:
-                reward -= 0.05
             
             episode_reward += reward
             memory_replay.add((state, next_state, action, reward, done))
             if memory_replay.size() > 128:
                 learn_steps += 1
-                if learn_steps % UPDATE_STEPS == 0:
-                    valueNetwork.load_state_dict(agent.state_dict())
+
                 batch = memory_replay.sample(BATCH, False)
                 batch_state, batch_next_state, batch_action, batch_reward, batch_done = zip(*batch)
 
@@ -200,7 +196,7 @@ def main():
 
                 with torch.no_grad():
                     onlineQ_next = agent(batch_next_state)
-                    targetQ_next = valueNetwork(batch_next_state)
+                    targetQ_next = targetNetwork(batch_next_state)
                     online_max_action = torch.argmax(onlineQ_next, dim=1, keepdim=True)
                     y = batch_reward + (1 - batch_done) * GAMMA * targetQ_next.gather(1, online_max_action.long())
 
@@ -208,6 +204,14 @@ def main():
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
+
+                if learn_steps % UPDATE_STEPS == 0:
+                    target_net_state_dict = targetNetwork.state_dict()
+                    policy_net_state_dict = agent.state_dict()
+                    for key in policy_net_state_dict:
+                        target_net_state_dict[key] = policy_net_state_dict[key] * TAU + target_net_state_dict[key] * (
+                                    1 - TAU)
+                    targetNetwork.load_state_dict(target_net_state_dict)
 
                 if epsilon > EPS_END:
                     epsilon = EPS_END + (EPS_START - EPS_END) * math.exp(-1. * epoch / EPS_DECAY)

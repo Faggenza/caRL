@@ -21,8 +21,6 @@ def train_ppo(device, env, img_stack=4, gamma=0.99,
     all_scores = []
     all_episodes = []
 
-    state = env.reset()
-
     for i_ep in range(1, epochs + 1):
         score = 0
         state = env.reset()

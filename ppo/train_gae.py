@@ -21,8 +21,6 @@ def train_ppo_gae(device, env, img_stack=4, gamma=0.99, gae_lambda=0.95,
     all_episodes = []
     initial_ep = 0
 
-    state = env.reset()
-
     for i_ep in range(initial_ep, 100000):
         score = 0
         state = env.reset()

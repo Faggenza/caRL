@@ -156,6 +156,8 @@ class AgentGAE(Agent):
                  path, transition=None, img_stack=4, gamma=0.99,
                  ppo_epoch=8, buffer_capacity=2000, gae_lambda=0.95,
                  batch_size=256, clip_param=0.2, learning_rate=1e-4):
+
+        super(AgentGAE, self).__init__()
         self.ppo_epoch = ppo_epoch
         self.buffer_capacity = buffer_capacity
         self.batch_size = batch_size

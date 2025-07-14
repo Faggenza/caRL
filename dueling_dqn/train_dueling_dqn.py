@@ -38,11 +38,9 @@ def train_dueling_dqn(path, device, batch_size=64, gamma=0.99,
     epsilon = epsilon_start
     learn_steps = 0
 
-    episode_reward = 0
     rewards = []
 
     for epoch in range(1, epochs + 1):
-        done = False
         state, _ = env.reset()
         episode_reward = 0
         for _ in count():

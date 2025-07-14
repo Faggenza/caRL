@@ -51,6 +51,13 @@ def parse_args():
     # Model parameters
     parser.add_argument("--model_path", type=str, default="saved_models/model.pt", help="Path to save/load model")
     parser.add_argument("--load", type=str, help="Load model from the specified path")
+    
+    # Video recording parameters
+    parser.add_argument("--record", action="store_true", help="Record video of the best performing trial")
+    parser.add_argument("--record_trials", type=int, default=5, help="Number of trials to run for recording (best one will be saved)")
+    parser.add_argument("--video_path", type=str, default="videos/", help="Directory to save recorded videos")
+    parser.add_argument("--video_fps", type=int, default=50, help="Frame rate for recorded videos (default: 50 fps)")
+    
     return parser.parse_args()
 
 def train(args, env, device):
@@ -154,6 +161,12 @@ def test(args, env, device):
     if not args.load:
         print("No model specified for testing. Use --load or --model_path to specify a model.")
         return
+       
+    if args.record:
+        from video_recorder import record_best_performance
+        record_best_performance(args, env, device)
+        return
+    
     print("Starting testing:")
     print(f"  Test episodes: {args.test_episodes}")
     print(f"  Model path: {args.load}")
@@ -201,7 +214,14 @@ def set_seed(seed, device, env):
 def main():
     args = parse_args()
         
-    render = 'human' if args.test else 'rgb_array'
+    # Set render mode based on test mode and recording
+    if args.test and args.record:
+        render = 'rgb_array'  # Always use rgb_array for recording
+    elif args.test:
+        render = 'human' if not args.record else 'rgb_array'
+    else:
+        render = 'rgb_array'
+        
     device = torch.device(
         "cuda" if torch.cuda.is_available() else
         "mps" if torch.backends.mps.is_available() else

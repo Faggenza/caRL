@@ -72,11 +72,32 @@ The main file expects the following inputs:
 | `--model_path` | str | saved_models/model.pt | Path to save/load model |
 | `--load` | str | None | Path to load a pre-trained model |
 
+#### Video Recording Parameters
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--record` | flag | False | Record video of the best performing trial |
+| `--record_trials` | int | 5 | Number of trials to run for recording (best one will be saved) |
+| `--video_path` | str | videos/ | Directory to save recorded videos |
+| `--video_fps` | int | 50 | Frame rate for recorded videos |
+
 ### Example
 
+#### Training
 ```bash
 python main.py --algorithm dqn --model_path --test_interval 50 --test_episodes 5 --print_interval 10 --batch_size 256 --epochs 2000
 ```
+
+#### Testing
+```bash
+python main.py --test --algorithm dqn --load saved_models/model.pt --test_episodes 10
+```
+
+#### Recording Video of Best Performance
+```bash
+python main.py --test --record --algorithm dqn --load saved_models/model.pt --record_trials 5 --video_path videos/
+```
+
+This will run 5 trials, find the one with the highest score, and save a video of that trial to the `videos/` directory.
 
 ##  Results
 

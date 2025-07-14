@@ -4,6 +4,8 @@ import gymnasium as gym
 import random
 import numpy as np
 
+torch.set_num_threads(1)
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Training and testing RL models")
@@ -41,7 +43,7 @@ def parse_args():
     parser.add_argument("--ppo_epoch", type=int, default=8, help="Number of PPO epochs per update")
     parser.add_argument("--buffer_capacity", type=int, default=2000, help="Capacity of the PPO buffer")
     parser.add_argument("--clip_param", type=float, default=0.2, help="PPO clip parameter")
-    parser.add_argument("--action_repeat", type=int, default=4, help="Number of action repeats in PPO")
+    parser.add_argument("--action_repeat", type=int, default=8, help="Number of action repeats in PPO")
     parser.add_argument('--img-stack', type=int, default=4, metavar='N', help='stack N image in a state (default: 4)')
     # PPO GAE
     parser.add_argument("--gae_lambda", type=float, default=0.0, help="Lambda for GAE")
@@ -109,6 +111,16 @@ def train(args, env, device):
             print(f"  Action Repeat: {args.action_repeat}")
             print(f"  Image Stack: {args.img_stack}")
             print(f"  GAE Lambda: {args.gae_lambda}")
+            print(f"  PPO Epochs: {args.ppo_epoch}")
+            print(f"  Buffer Capacity: {args.buffer_capacity}")
+            print(f"  Clip Parameter: {args.clip_param}")
+            print(f"  Batch Size: {args.batch_size}")
+            print(f"  Gamma (Discount Factor): {args.gamma}")
+            print(f"  Learning Rate: {args.learning_rate}")
+            print(f"  Test Interval: {args.test_interval}")
+            print(f"  Test Episodes: {args.test_episodes}")
+            print(f"  Print Interval: {args.print_interval}")
+            print(f"  Training Epochs: {args.epochs}")
             print(f"  Model Path: {args.model_path}")
             
             if args.gae_lambda < 0 or args.gae_lambda > 1:
@@ -129,8 +141,12 @@ def train(args, env, device):
                           ppo_epoch=args.ppo_epoch, batch_size=args.batch_size, clip_param=args.clip_param)
             else:
                 print("Using PPO with GAE")
-                from ppo.main_train_GAE import train_ppo
-                # TODO: Implement GAE training
+                from ppo.train_gae import train_ppo_gae
+                train_ppo_gae(path=args.model_path, device=device, img_stack=args.img_stack,
+                              epochs=args.epochs, gamma=args.gamma, test_interval=args.test_interval,
+                              test_episodes=args.test_episodes, print_interval=args.print_interval,
+                              env=wrapped_env, buffer_capacity=args.buffer_capacity, gae_lambda=args.gae_lambda,
+                              ppo_epoch=args.ppo_epoch, batch_size=args.batch_size, clip_param=args.clip_param)
         case _:
             print(f"Unknown algorithm: {args.algorithm}")
             return
@@ -162,11 +178,11 @@ def test(args, env, device):
                          num_episodes=args.test_episodes, env=env)
             plot_training_progress(scores=train_rewards, episodes=list(range(1, len(train_rewards) + 1)))
         case "ppo":
-            from ppo.test import test_ppo
+            from ppo.test_ppo import test_ppo
             # Wrap the environment
             from ppo.env import Env
             wrapped_env = Env(env=env, img_stack=args.img_stack, action_repeat=args.action_repeat)
-            test_ppo(device=device, path=args.load, env=wrapped_env, img_stack=args.img_stack, test_episodes=args.test_episodes)
+            test_ppo(device=device, gae_lambda=args.gae_lambda, path=args.load, env=wrapped_env, img_stack=args.img_stack, test_episodes=args.test_episodes)
     
 def set_seed(seed, device, env):
     torch.manual_seed(seed)

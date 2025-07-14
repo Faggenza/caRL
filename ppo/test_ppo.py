@@ -1,13 +1,17 @@
 import numpy as np
 import torch
 from plot import plot_training_progress
-from ppo.env import Env
-from ppo.network import Agent
+from ppo.network import Agent, AgentGAE
 
 
-def test_ppo(device, path, env, img_stack=4, test_episodes=10):
+def test_ppo(device, gae_lambda, path, env, img_stack=4, test_episodes=10):
+    torch.set_num_threads(1)
     
-    agent = Agent(env.action_dim, path=path, device=device, img_stack=img_stack)
+    if gae_lambda == 0:
+        agent = Agent(env.action_dim, path=path, device=device, img_stack=img_stack)
+    else:
+        agent = AgentGAE(env.action_dim, path=path, device=device, img_stack=img_stack)
+        
     agent.load_param()
     checkpoint = torch.load(path, map_location=device)
 
@@ -50,4 +54,5 @@ def test_ppo(device, path, env, img_stack=4, test_episodes=10):
     print(f"Min reward: {min_reward:.2f}")
     print(f"Training episodes: {i_ep}")
     print(f"Training average (last 100 episodes): {np.mean(all_scores[-100:]):.2f}")
+    print(f"=======================\n")
 

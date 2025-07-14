@@ -62,6 +62,8 @@ def test(policy_net_state_dict, train_rewards, device, env, num_episodes=5):
     print(f"Min reward: {min_reward:.2f}")
     print(f"Training episodes: {episodes.__len__()}")
     print(f"Training average (last 100 episodes): {np.mean(train_rewards[-100:]):.2f}")
+    print(f"=======================\n")
+
 
 
     return test_rewards

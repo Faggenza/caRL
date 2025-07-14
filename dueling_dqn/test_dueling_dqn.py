@@ -55,5 +55,6 @@ def test_dueling(dueling_dqn_param, train_rewards, device, num_episodes=10, env=
         print(f"Min reward: {min_reward:.2f}")
         print(f"Training episodes: {episode}")
         print(f"Training average (last 100 episodes): {np.mean(train_rewards[-100:]):.2f}")
-        
+        print(f"=======================\n")
+
         return test_rewards

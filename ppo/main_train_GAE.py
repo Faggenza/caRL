@@ -8,7 +8,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Categorical
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
-from utils import DrawLine, plot_training_progress
+from utils import plot_training_progress
 
 parser = argparse.ArgumentParser(description='Train a PPO agent for the CarRacing-v0')
 parser.add_argument('--gamma', type=float, default=0.99, metavar='G', help='discount factor (default: 0.99)')

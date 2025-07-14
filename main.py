@@ -17,6 +17,7 @@ def parse_args():
 
     
     # Common hyperparameters
+    parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor for future rewards")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility (default: 42)")
     parser.add_argument("--learning_rate", type=float, default=3e-4, help="Learning rate")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
@@ -27,7 +28,6 @@ def parse_args():
     
     
     # DQN/Dueling specific hyperparameters
-    parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor for future rewards")
     parser.add_argument("--epsilon_start", type=float, default=0.9, help="Starting value of epsilon for epsilon-greedy policy")
     parser.add_argument("--epsilon_end", type=float, default=0.01, help="Final value of epsilon for epsilon-greedy policy")
     parser.add_argument("--epsilon_decay", type=float, default=65000, help="Decay rate of epsilon")
@@ -35,6 +35,16 @@ def parse_args():
     parser.add_argument("--replay_memory_size", type=int, default=10000, help="Size of replay memory")
     # Just for Dueling DQN
     parser.add_argument("--update_steps", type=int, default=4, help="Number of steps to update the network")
+    
+    
+    # PPO specific hyperparameters
+    parser.add_argument("--ppo_epoch", type=int, default=8, help="Number of PPO epochs per update")
+    parser.add_argument("--buffer_capacity", type=int, default=2000, help="Capacity of the PPO buffer")
+    parser.add_argument("--clip_param", type=float, default=0.2, help="PPO clip parameter")
+    parser.add_argument("--action_repeat", type=int, default=4, help="Number of action repeats in PPO")
+    parser.add_argument('--img-stack', type=int, default=4, metavar='N', help='stack N image in a state (default: 4)')
+    # PPO GAE
+    parser.add_argument("--gae_lambda", type=float, default=0.0, help="Lambda for GAE")
     
     # Model parameters
     parser.add_argument("--model_path", type=str, default="saved_models/model.pt", help="Path to save/load model")
@@ -95,7 +105,32 @@ def train(args, env, device):
                               test_episodes=args.test_episodes,
                               print_interval=args.print_interval, env=env)
         case "ppo":
-            return
+            print("PPO-specific parameters:")
+            print(f"  Action Repeat: {args.action_repeat}")
+            print(f"  Image Stack: {args.img_stack}")
+            print(f"  GAE Lambda: {args.gae_lambda}")
+            print(f"  Model Path: {args.model_path}")
+            
+            if args.gae_lambda < 0 or args.gae_lambda > 1:
+                raise ValueError("GAE lambda must be between 0 and 1")
+            
+            # Wrap the environment
+            from ppo.env import Env
+            wrapped_env = Env(env=env, img_stack=args.img_stack, action_repeat=args.action_repeat)
+
+            if args.gae_lambda == 0:
+                print("Using PPO without GAE")
+                from ppo.train import train_ppo
+                
+                train_ppo(path=args.model_path, device=device, img_stack=args.img_stack,
+                          epochs=args.epochs, gamma=args.gamma, test_interval=args.test_interval,
+                          test_episodes=args.test_episodes, print_interval=args.print_interval,
+                          env=wrapped_env, buffer_capacity=args.buffer_capacity,
+                          ppo_epoch=args.ppo_epoch, batch_size=args.batch_size, clip_param=args.clip_param)
+            else:
+                print("Using PPO with GAE")
+                from ppo.main_train_GAE import train_ppo
+                # TODO: Implement GAE training
         case _:
             print(f"Unknown algorithm: {args.algorithm}")
             return
@@ -127,7 +162,11 @@ def test(args, env, device):
                          num_episodes=args.test_episodes, env=env)
             plot_training_progress(scores=train_rewards, episodes=list(range(1, len(train_rewards) + 1)))
         case "ppo":
-            return
+            from ppo.test import test_ppo
+            # Wrap the environment
+            from ppo.env import Env
+            wrapped_env = Env(env=env, img_stack=args.img_stack, action_repeat=args.action_repeat)
+            test_ppo(device=device, path=args.load, env=wrapped_env, img_stack=args.img_stack, test_episodes=args.test_episodes)
     
 def set_seed(seed, device, env):
     torch.manual_seed(seed)

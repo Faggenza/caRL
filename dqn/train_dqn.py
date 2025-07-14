@@ -59,18 +59,6 @@ def optimize_model(memory, q_net, target_net, optimizer, device, batch_size, gam
     optimizer.step()
 
 
-# BATCH_SIZE is the number of transitions sampled from the replay buffer
-# EPSILON_DECAY is the discount factor as mentioned in the previous section
-# EPS_START is the starting value of epsilon
-# EPS_END is the final value of epsilon
-# epsilon_decay controls the rate of exponential decay of epsilon, higher means a slower decay
-# TAU is the update rate of the target network
-# learning_rate is the learning rate of the ``AdamW`` optimizer  
-# replay_memory_size is the size of the replay memory buffer
-# epochs is the number of training episodes
-# env is the environment to train on, e.g., CarRacing-v3
-# path is the path to save the model
-# device is the device to run the model on (CPU or GPU)
 def train_dqn(path, device, batch_size=128, gamma=0.99, epsilon_start=0.9,
               epsilon_end=0.01, epsilon_decay=65000, tau=0.005,
               learning_rate=3e-4, replay_memory_size=10000, epochs=1000,
